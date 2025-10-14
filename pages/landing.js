@@ -17,6 +17,12 @@ export default function LandingPage() {
       {/* Navbar */}
       <Navbar />
 
+      <div className="animated-bg">
+        <div className="blob blob1"></div>
+        <div className="blob blob2"></div>
+        <div className="blob blob3"></div>
+      </div>
+
       {/* ===== Section 1: Intro ===== */}
       <section className="min-h-screen flex items-center justify-center pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

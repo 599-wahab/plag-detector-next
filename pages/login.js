@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Router from 'next/router';
 import Navbar from '../components/Navbar';
-import '@/styles/AnimatedBackground.css';
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
