@@ -13,6 +13,10 @@ export default function MeetingPage() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const pcRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const processorRef = useRef(null);
+  const mediaStreamSourceRef = useRef(null);
 
   const [joined, setJoined] = useState(false);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
@@ -22,6 +26,9 @@ export default function MeetingPage() {
   const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const [userRole, setUserRole] = useState(null);
   const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
 
   useEffect(() => {
     if (!roomId) return;
@@ -184,8 +191,159 @@ export default function MeetingPage() {
       if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
       }
+      // Clean up audio processing
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+      }
+      if (mediaStreamSourceRef.current) {
+        mediaStreamSourceRef.current.disconnect();
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
     };
   }, [roomId]);
+
+  // Setup audio processing for real-time transcription
+  const setupAudioProcessing = async () => {
+    if (!localStream) return;
+
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioContextRef.current = audioContext;
+
+      const source = audioContext.createMediaStreamSource(localStream);
+      mediaStreamSourceRef.current = source;
+
+      // Create script processor for audio processing
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      let audioChunks = [];
+      let recordingStartTime = 0;
+
+      processor.onaudioprocess = (event) => {
+        if (!isTranscribing) return;
+
+        const inputData = event.inputBuffer.getChannelData(0);
+        
+        // Convert float32 to int16 for Whisper API
+        const int16Data = convertFloat32ToInt16(inputData);
+        audioChunks.push(int16Data);
+
+        // Send audio chunks every 3 seconds for near real-time
+        const currentTime = Date.now();
+        if (currentTime - recordingStartTime >= 3000) {
+          sendAudioToWhisper(audioChunks);
+          audioChunks = [];
+          recordingStartTime = currentTime;
+        }
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      console.log("Audio processing setup complete");
+      setIsTranscribing(true);
+    } catch (error) {
+      console.error("Error setting up audio processing:", error);
+    }
+  };
+
+  // Convert Float32 to Int16 for Whisper API
+  const convertFloat32ToInt16 = (float32Array) => {
+    const int16Array = new Int16Array(float32Array.length);
+    for (let i = 0; i < float32Array.length; i++) {
+      const s = Math.max(-1, Math.min(1, float32Array[i]));
+      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return int16Array;
+  };
+
+  // Send audio to Whisper API for real-time transcription
+  const sendAudioToWhisper = async (audioChunks) => {
+    try {
+      // Combine audio chunks
+      const totalLength = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combinedData = new Int16Array(totalLength);
+      let offset = 0;
+      audioChunks.forEach(chunk => {
+        combinedData.set(chunk, offset);
+        offset += chunk.length;
+      });
+
+      // Convert to blob for sending to API
+      const audioBlob = new Blob([combinedData.buffer], { type: 'audio/wav' });
+      
+      // Create FormData for Whisper API
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'audio.wav');
+      formData.append('model', 'whisper-1');
+      formData.append('language', 'en'); // Optional: specify language
+      formData.append('response_format', 'json');
+
+      const response = await fetch('/api/transcribe-realtime', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.text && data.text.trim()) {
+          const newTranscript = data.text.trim();
+          setTranscript(prev => prev + " " + newTranscript);
+          
+          // Send transcript to interviewer via socket in real-time
+          socket.emit('transcript-update', {
+            roomId,
+            transcript: newTranscript,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error sending audio to Whisper:", error);
+    }
+  };
+
+  // Toggle real-time transcription
+  const toggleTranscription = async () => {
+    if (transcriptionEnabled) {
+      // Stop transcription
+      setIsTranscribing(false);
+      setTranscriptionEnabled(false);
+      
+      // Clean up audio processing
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+      }
+      if (mediaStreamSourceRef.current) {
+        mediaStreamSourceRef.current.disconnect();
+      }
+      if (audioContextRef.current) {
+        await audioContextRef.current.close();
+      }
+      
+      setTranscript(""); // Clear transcript when stopping
+    } else {
+      // Start transcription
+      setTranscriptionEnabled(true);
+      await setupAudioProcessing();
+    }
+  };
+
+  // Listen for transcript updates from candidate (for interviewer)
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on('transcript-update', ({ transcript: newTranscript }) => {
+      setTranscript(prev => prev + " " + newTranscript);
+    });
+
+    return () => {
+      socket.off('transcript-update');
+    };
+  }, []);
 
   // FIXED: Update remote video when remoteStream changes
   useEffect(() => {
@@ -221,6 +379,23 @@ export default function MeetingPage() {
 
   // End call and leave meeting - redirect to appropriate dashboard
   const endCall = () => {
+    // Stop transcription if active
+    if (transcriptionEnabled) {
+      setIsTranscribing(false);
+      setTranscriptionEnabled(false);
+      
+      // Clean up audio processing
+      if (processorRef.current) {
+        processorRef.current.disconnect();
+      }
+      if (mediaStreamSourceRef.current) {
+        mediaStreamSourceRef.current.disconnect();
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    }
+
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
     }
@@ -247,6 +422,11 @@ export default function MeetingPage() {
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId);
     alert(`Room ID ${roomId} copied to clipboard!`);
+  };
+
+  // Clear transcript
+  const clearTranscript = () => {
+    setTranscript("");
   };
 
   return (
@@ -319,6 +499,57 @@ export default function MeetingPage() {
         </div>
       </div>
 
+      {/* Real-time Transcription Section */}
+      {(userRole === 'interviewer' || transcriptionEnabled) && (
+        <div className="w-full max-w-6xl bg-gray-800 rounded-lg p-4 mb-4">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold">
+              <i className="fas fa-comment-alt mr-2"></i>
+              Live Speech-to-Text
+              {isTranscribing && (
+                <span className="ml-2 text-xs bg-green-500 px-2 py-1 rounded-full animate-pulse">
+                  Listening...
+                </span>
+              )}
+            </h3>
+            <div className="flex space-x-2">
+              {userRole === 'candidate' && (
+                <button
+                  onClick={toggleTranscription}
+                  className={`px-3 py-1 rounded text-sm transition-colors ${
+                    transcriptionEnabled 
+                      ? 'bg-red-500 hover:bg-red-600' 
+                      : 'bg-green-500 hover:bg-green-600'
+                  }`}
+                >
+                  <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} mr-1`}></i>
+                  {transcriptionEnabled ? 'Stop Transcription' : 'Start Transcription'}
+                </button>
+              )}
+              <button
+                onClick={clearTranscript}
+                className="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-sm transition-colors"
+              >
+                <i className="fas fa-trash mr-1"></i>
+                Clear
+              </button>
+            </div>
+          </div>
+          <div className="bg-gray-900 rounded p-3 max-h-32 overflow-y-auto">
+            {transcript ? (
+              <p className="text-white text-sm leading-relaxed">{transcript}</p>
+            ) : (
+              <p className="text-gray-400 text-sm">
+                {userRole === 'candidate' 
+                  ? 'Start transcription to convert your speech to text in real-time...'
+                  : 'Waiting for candidate speech transcription...'
+                }
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="flex space-x-4 bg-black bg-opacity-50 rounded-full px-6 py-3">
         {/* Audio Toggle */}
@@ -341,6 +572,19 @@ export default function MeetingPage() {
           <i className={`fas ${isVideoOff ? 'fa-video-slash' : 'fa-video'} text-xl`}></i>
         </button>
 
+        {/* Transcription Toggle (Candidate only) */}
+        {userRole === 'candidate' && (
+          <button
+            onClick={toggleTranscription}
+            className={`p-3 rounded-full transition-all duration-300 ${
+              transcriptionEnabled ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-600 hover:bg-gray-700'
+            }`}
+            title={transcriptionEnabled ? "Stop Transcription" : "Start Real-time Transcription"}
+          >
+            <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} text-xl`}></i>
+          </button>
+        )}
+
         {/* End Call */}
         <button
           onClick={endCall}
@@ -354,12 +598,6 @@ export default function MeetingPage() {
       <div className="mt-4 text-center text-gray-400 text-sm">
         <p>Share the Room ID with others to let them join: <strong>{roomId}</strong></p>
         <p className="mt-1">You will be redirected to your {userRole} dashboard when the call ends.</p>
-      </div>
-
-      {/* Debug Info */}
-      <div className="mt-2 text-center text-xs text-gray-500">
-        <p>Local: {localStream ? `${localStream.getVideoTracks().length} video, ${localStream.getAudioTracks().length} audio tracks` : 'No stream'}</p>
-        <p>Remote: {remoteStream ? `${remoteStream.getVideoTracks().length} video, ${remoteStream.getAudioTracks().length} audio tracks` : 'No stream'}</p>
       </div>
     </div>
   );
