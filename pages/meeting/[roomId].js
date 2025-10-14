@@ -18,8 +18,10 @@ export default function MeetingPage() {
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const [userRole, setUserRole] = useState(null);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
 
   useEffect(() => {
     if (!roomId) return;
@@ -44,22 +46,47 @@ export default function MeetingPage() {
       console.log("Connection state:", pc.connectionState);
     };
 
+    // FIXED: Proper track event handling
     pc.ontrack = (event) => {
-      console.log("Received remote track");
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+      console.log("Received remote track:", event.track.kind);
+      
+      if (event.streams && event.streams[0]) {
+        const stream = event.streams[0];
+        setRemoteStream(stream);
+        setHasRemoteVideo(true);
+        
+        // Set up track ended listeners
+        event.track.onended = () => {
+          console.log("Remote track ended:", event.track.kind);
+          if (event.track.kind === 'video') {
+            setHasRemoteVideo(false);
+          }
+        };
       }
     };
 
     // Get user media and set up local stream
     navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
+      .getUserMedia({ 
+        video: true, 
+        audio: true 
+      })
       .then((stream) => {
+        console.log("Got local stream with tracks:", {
+          video: stream.getVideoTracks().length,
+          audio: stream.getAudioTracks().length
+        });
+        
         setLocalStream(stream);
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          // Force play the video
+          localVideoRef.current.play().catch(e => console.log("Local video play error:", e));
+        }
         
         // Add all tracks to peer connection
         stream.getTracks().forEach((track) => {
+          console.log("Adding local track:", track.kind, track.readyState);
           pc.addTrack(track, stream);
         });
       })
@@ -78,7 +105,11 @@ export default function MeetingPage() {
       setConnectionStatus("Creating offer...");
       
       try {
-        const offer = await pc.createOffer();
+        // FIXED: Create offer with proper media directions
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true
+        });
         await pc.setLocalDescription(offer);
         socket.emit("offer", { roomId, offer });
         setConnectionStatus("Offer sent");
@@ -95,7 +126,11 @@ export default function MeetingPage() {
       
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await pc.createAnswer();
+        // FIXED: Create answer with proper media directions
+        const answer = await pc.createAnswer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true
+        });
         await pc.setLocalDescription(answer);
         socket.emit("answer", { roomId, answer });
         setConnectionStatus("Answer sent");
@@ -122,7 +157,9 @@ export default function MeetingPage() {
     // Handle ICE candidates
     socket.on("ice-candidate", async ({ candidate }) => {
       try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        if (candidate) {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
       } catch (err) {
         console.error("Error adding ICE candidate:", err);
       }
@@ -149,6 +186,16 @@ export default function MeetingPage() {
       }
     };
   }, [roomId]);
+
+  // FIXED: Update remote video when remoteStream changes
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      console.log("Setting remote video stream");
+      remoteVideoRef.current.srcObject = remoteStream;
+      // Force play the remote video
+      remoteVideoRef.current.play().catch(e => console.log("Remote video play error:", e));
+    }
+  }, [remoteStream]);
 
   // Toggle audio mute/unmute
   const toggleAudio = () => {
@@ -237,6 +284,7 @@ export default function MeetingPage() {
             ref={localVideoRef} 
             autoPlay 
             muted 
+            playsInline
             className="w-full h-64 lg:h-96 object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
@@ -254,17 +302,20 @@ export default function MeetingPage() {
           <video 
             ref={remoteVideoRef} 
             autoPlay 
+            playsInline
             className="w-full h-64 lg:h-96 object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
             Participant
           </div>
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-            <div className="text-center">
-              <i className="fas fa-user text-4xl text-gray-400 mb-2"></i>
-              <p className="text-gray-400">Waiting for participant to join...</p>
+          {!hasRemoteVideo && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+              <div className="text-center">
+                <i className="fas fa-user text-4xl text-gray-400 mb-2"></i>
+                <p className="text-gray-400">Waiting for participant to join...</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -303,6 +354,12 @@ export default function MeetingPage() {
       <div className="mt-4 text-center text-gray-400 text-sm">
         <p>Share the Room ID with others to let them join: <strong>{roomId}</strong></p>
         <p className="mt-1">You will be redirected to your {userRole} dashboard when the call ends.</p>
+      </div>
+
+      {/* Debug Info */}
+      <div className="mt-2 text-center text-xs text-gray-500">
+        <p>Local: {localStream ? `${localStream.getVideoTracks().length} video, ${localStream.getAudioTracks().length} audio tracks` : 'No stream'}</p>
+        <p>Remote: {remoteStream ? `${remoteStream.getVideoTracks().length} video, ${remoteStream.getAudioTracks().length} audio tracks` : 'No stream'}</p>
       </div>
     </div>
   );
