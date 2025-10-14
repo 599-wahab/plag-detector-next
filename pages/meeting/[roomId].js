@@ -1,3 +1,4 @@
+// pages/meeting/[roomId].js
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -19,7 +20,7 @@ export default function MeetingPage() {
     if (!roomId) return;
 
     // Connect to the signaling server
-    socket = io("https://my-socket-server.onrender.com"); // <-- your Render URL
+    socket = io("https://plag-detector-next.onrender.com"); // <-- your Render URL
 
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
