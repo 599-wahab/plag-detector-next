@@ -17,6 +17,7 @@ export default function MeetingPage() {
   const audioContextRef = useRef(null);
   const processorRef = useRef(null);
   const mediaStreamSourceRef = useRef(null);
+  const localVideoContainerRef = useRef(null);
 
   const [joined, setJoined] = useState(false);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
@@ -29,6 +30,13 @@ export default function MeetingPage() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(false);
+
+  // Draggable video state
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isVideoHidden, setIsVideoHidden] = useState(false);
 
   useEffect(() => {
     if (!roomId) return;
@@ -75,8 +83,16 @@ export default function MeetingPage() {
     // Get user media and set up local stream
     navigator.mediaDevices
       .getUserMedia({ 
-        video: true, 
-        audio: true 
+        video: { 
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
+        }, 
+        audio: { 
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
       })
       .then((stream) => {
         console.log("Got local stream with tracks:", {
@@ -87,7 +103,6 @@ export default function MeetingPage() {
         setLocalStream(stream);
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
-          // Force play the video
           localVideoRef.current.play().catch(e => console.log("Local video play error:", e));
         }
         
@@ -112,7 +127,6 @@ export default function MeetingPage() {
       setConnectionStatus("Creating offer...");
       
       try {
-        // FIXED: Create offer with proper media directions
         const offer = await pc.createOffer({
           offerToReceiveAudio: true,
           offerToReceiveVideo: true
@@ -133,7 +147,6 @@ export default function MeetingPage() {
       
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        // FIXED: Create answer with proper media directions
         const answer = await pc.createAnswer({
           offerToReceiveAudio: true,
           offerToReceiveVideo: true
@@ -179,19 +192,25 @@ export default function MeetingPage() {
       }
     };
 
+    // Set initial position for local video (bottom right corner)
+    setPosition({ x: 20, y: 20 });
+
     setJoined(true);
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
-      if (pcRef.current) {
-        pcRef.current.close();
-      }
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-      // Clean up audio processing
+      cleanupMedia();
+    };
+  }, [roomId]);
+
+  // Cleanup media resources
+  const cleanupMedia = () => {
+    console.log("Cleaning up media resources...");
+    
+    // Stop transcription if active
+    if (transcriptionEnabled) {
+      setIsTranscribing(false);
+      setTranscriptionEnabled(false);
+      
       if (processorRef.current) {
         processorRef.current.disconnect();
       }
@@ -199,10 +218,145 @@ export default function MeetingPage() {
         mediaStreamSourceRef.current.disconnect();
       }
       if (audioContextRef.current) {
-        audioContextRef.current.close();
+        audioContextRef.current.close().catch(console.error);
       }
-    };
-  }, [roomId]);
+    }
+
+    // Stop local stream tracks
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        console.log(`Stopping track: ${track.kind}`);
+        track.stop();
+      });
+      setLocalStream(null);
+    }
+
+    // Close peer connection
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+
+    // Disconnect socket
+    if (socket) {
+      socket.disconnect();
+    }
+  };
+
+  // Toggle video hide/show
+  const toggleVideoHide = () => {
+    if (isVideoHidden) {
+      // Show video - return to original position
+      setIsVideoHidden(false);
+    } else {
+      // Hide video to the right side - only show 40px
+      const container = document.querySelector('.main-video-container');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const videoRect = localVideoContainerRef.current.getBoundingClientRect();
+        
+        // Position so only 40px is visible on the right edge
+        const hiddenX = containerRect.width - 40;
+        const currentY = position.y;
+        
+        setPosition({ x: hiddenX, y: currentY });
+        setIsVideoHidden(true);
+      }
+    }
+  };
+
+  // Draggable video handlers
+  const handleMouseDown = (e) => {
+    if (isVideoHidden) return; // Don't allow dragging when hidden
+    e.preventDefault();
+    setIsDragging(true);
+    const rect = localVideoContainerRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  };
+
+  const handleTouchStart = (e) => {
+    if (isVideoHidden) return; // Don't allow dragging when hidden
+    const touch = e.touches[0];
+    setIsDragging(true);
+    const rect = localVideoContainerRef.current.getBoundingClientRect();
+    setDragOffset({
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top
+    });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging || isVideoHidden) return;
+    
+    const container = document.querySelector('.main-video-container');
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const videoRect = localVideoContainerRef.current.getBoundingClientRect();
+    
+    const x = Math.max(0, Math.min(
+      e.clientX - dragOffset.x,
+      containerRect.width - videoRect.width
+    ));
+    
+    const y = Math.max(0, Math.min(
+      e.clientY - dragOffset.y,
+      containerRect.height - videoRect.height
+    ));
+
+    setPosition({ x, y });
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging || isVideoHidden) return;
+    
+    const touch = e.touches[0];
+    const container = document.querySelector('.main-video-container');
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const videoRect = localVideoContainerRef.current.getBoundingClientRect();
+    
+    const x = Math.max(0, Math.min(
+      touch.clientX - dragOffset.x,
+      containerRect.width - videoRect.width
+    ));
+    
+    const y = Math.max(0, Math.min(
+      touch.clientY - dragOffset.y,
+      containerRect.height - videoRect.height
+    ));
+
+    setPosition({ x, y });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  // Add global event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [isDragging, dragOffset]);
 
   // Setup audio processing for real-time transcription
   const setupAudioProcessing = async () => {
@@ -279,7 +433,7 @@ export default function MeetingPage() {
       const formData = new FormData();
       formData.append('file', audioBlob, 'audio.wav');
       formData.append('model', 'whisper-1');
-      formData.append('language', 'en'); // Optional: specify language
+      formData.append('language', 'en');
       formData.append('response_format', 'json');
 
       const response = await fetch('/api/transcribe-realtime', {
@@ -324,7 +478,7 @@ export default function MeetingPage() {
         await audioContextRef.current.close();
       }
       
-      setTranscript(""); // Clear transcript when stopping
+      setTranscript("");
     } else {
       // Start transcription
       setTranscriptionEnabled(true);
@@ -350,7 +504,6 @@ export default function MeetingPage() {
     if (remoteVideoRef.current && remoteStream) {
       console.log("Setting remote video stream");
       remoteVideoRef.current.srcObject = remoteStream;
-      // Force play the remote video
       remoteVideoRef.current.play().catch(e => console.log("Remote video play error:", e));
     }
   }, [remoteStream]);
@@ -377,43 +530,23 @@ export default function MeetingPage() {
     }
   };
 
-  // End call and leave meeting - redirect to appropriate dashboard
-  const endCall = () => {
-    // Stop transcription if active
-    if (transcriptionEnabled) {
-      setIsTranscribing(false);
-      setTranscriptionEnabled(false);
-      
-      // Clean up audio processing
-      if (processorRef.current) {
-        processorRef.current.disconnect();
-      }
-      if (mediaStreamSourceRef.current) {
-        mediaStreamSourceRef.current.disconnect();
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    }
-
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
-    if (pcRef.current) {
-      pcRef.current.close();
-    }
-    if (socket) {
-      socket.disconnect();
-    }
-
-    // Redirect to appropriate dashboard based on user role
+  // End call and leave meeting - FIXED: Proper cleanup
+  const endCall = async () => {
+    console.log("Ending call and cleaning up...");
+    
+    // Clean up media resources first
+    cleanupMedia();
+    
+    // Wait a bit for cleanup to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Redirect to appropriate dashboard
     const role = localStorage.getItem('role');
     if (role === 'interviewer') {
       router.push('/dashboard/interviewer');
     } else if (role === 'candidate') {
       router.push('/dashboard/candidate');
     } else {
-      // Fallback to home if no role found
       router.push('/');
     }
   };
@@ -430,174 +563,275 @@ export default function MeetingPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
-      {/* Header */}
-      <div className="w-full max-w-6xl mb-4">
+    <div className="flex flex-col min-h-screen bg-gray-900 text-white">
+      {/* Header - Compact */}
+      <div className="bg-gray-800 bg-opacity-90 backdrop-blur-sm border-b border-gray-700 px-4 py-3">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold">Meeting Room: {roomId}</h2>
-          <div className="flex items-center space-x-4">
-            <span className={`px-3 py-1 rounded-full text-sm ${
+          <div className="flex items-center space-x-3">
+            <div className={`w-3 h-3 rounded-full ${
               connectionStatus === "Connected" ? "bg-green-500" : 
               connectionStatus.includes("Error") ? "bg-red-500" : "bg-yellow-500"
-            }`}>
-              {connectionStatus}
+            }`}></div>
+            <h1 className="text-lg font-semibold">Meeting Room</h1>
+            <span className="text-sm text-gray-300 bg-gray-700 px-2 py-1 rounded">
+              {roomId}
+            </span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <span className="text-sm text-gray-300 capitalize">
+              {userRole || 'guest'}
             </span>
             <button
               onClick={copyRoomId}
-              className="bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded text-sm transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm transition-colors duration-200"
             >
               <i className="fas fa-copy mr-1"></i>
               Copy ID
             </button>
-            <span className="text-sm text-gray-300">
-              ({userRole || 'Guest'})
-            </span>
           </div>
         </div>
       </div>
 
-      {/* Video Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full max-w-6xl mb-4">
-        {/* Local Video */}
-        <div className="relative bg-black rounded-lg overflow-hidden">
+      {/* Main Video Area */}
+      <div className="flex-1 relative bg-black overflow-hidden main-video-container">
+        {/* Remote Video - Main Participant (Full Screen) */}
+        <div className="absolute inset-0">
+          <video 
+            ref={remoteVideoRef} 
+            autoPlay 
+            playsInline
+            className="w-full h-full object-cover"
+          />
+          {!hasRemoteVideo && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i className="fas fa-user text-3xl text-gray-400"></i>
+                </div>
+                <p className="text-gray-400 text-lg">Waiting for participant to join...</p>
+                <p className="text-gray-500 text-sm mt-2">Share the Room ID: <strong>{roomId}</strong></p>
+              </div>
+            </div>
+          )}
+          <div className="absolute bottom-4 left-4 bg-black bg-opacity-60 backdrop-blur-sm px-3 py-2 rounded-lg">
+            <span className="text-white text-sm">Participant</span>
+          </div>
+        </div>
+
+        {/* Local Video - Draggable Overlay */}
+        <div
+          ref={localVideoContainerRef}
+          className={`absolute w-64 h-48 md:w-80 md:h-60 bg-black rounded-xl overflow-hidden border-2 transition-all duration-300 ${
+            isVideoHidden 
+              ? 'border-purple-400 border-opacity-60' 
+              : isDragging 
+                ? 'border-blue-400 border-opacity-80' 
+                : 'border-white border-opacity-20'
+          } shadow-2xl ${
+            isVideoHidden ? 'cursor-default opacity-80' : 'cursor-move'
+          } ${isDragging ? 'scale-105 z-50' : 'scale-100 z-40'}`}
+          style={{
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            transform: `translate(0, 0) ${isDragging ? 'scale(1.05)' : 'scale(1)'}`,
+          }}
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+        >
           <video 
             ref={localVideoRef} 
             autoPlay 
             muted 
             playsInline
-            className="w-full h-64 lg:h-96 object-cover"
+            className="w-full h-full object-cover pointer-events-none"
           />
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
+          {isVideoOff && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-80">
+              <i className="fas fa-video-slash text-2xl text-gray-400"></i>
+            </div>
+          )}
+          <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 backdrop-blur-sm px-2 py-1 rounded text-sm">
             You {isVideoOff && "(Video Off)"}
           </div>
-          {isVideoOff && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-              <i className="fas fa-video-slash text-4xl text-gray-400"></i>
+          
+          {/* Drag Handle - Only show when not hidden */}
+          {!isVideoHidden && (
+            <div className="absolute top-2 right-2 bg-black bg-opacity-60 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-300">
+              <i className="fas fa-arrows-alt mr-1"></i>
+              Drag
             </div>
           )}
+
+          {/* Hide/Show Indicator */}
+          <div className="absolute top-2 left-2 bg-black bg-opacity-60 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-300">
+            <i className={`fas ${isVideoHidden ? 'fa-eye' : 'fa-eye-slash'} mr-1`}></i>
+            {isVideoHidden ? 'Hidden' : 'Visible'}
+          </div>
         </div>
 
-        {/* Remote Video */}
-        <div className="relative bg-black rounded-lg overflow-hidden">
-          <video 
-            ref={remoteVideoRef} 
-            autoPlay 
-            playsInline
-            className="w-full h-64 lg:h-96 object-cover"
-          />
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
-            Participant
-          </div>
-          {!hasRemoteVideo && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-              <div className="text-center">
-                <i className="fas fa-user text-4xl text-gray-400 mb-2"></i>
-                <p className="text-gray-400">Waiting for participant to join...</p>
-              </div>
+        {/* Connection Status Overlay */}
+        {connectionStatus !== "Connected" && (
+          <div className="absolute top-4 right-4 bg-black bg-opacity-70 backdrop-blur-sm px-4 py-2 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full animate-pulse ${
+                connectionStatus === "Connected" ? "bg-green-500" : 
+                connectionStatus.includes("Error") ? "bg-red-500" : "bg-yellow-500"
+              }`}></div>
+              <span className="text-sm">{connectionStatus}</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Real-time Transcription Section */}
+      {/* Transcript Panel - Collapsible */}
       {(userRole === 'interviewer' || transcriptionEnabled) && (
-        <div className="w-full max-w-6xl bg-gray-800 rounded-lg p-4 mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-lg font-semibold">
-              <i className="fas fa-comment-alt mr-2"></i>
-              Live Speech-to-Text
+        <div className={`bg-gray-800 border-t border-gray-700 transition-all duration-300 ${
+          showTranscript ? 'max-h-64' : 'max-h-12'
+        } overflow-hidden`}>
+          <button
+            onClick={() => setShowTranscript(!showTranscript)}
+            className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-750 transition-colors duration-200"
+          >
+            <div className="flex items-center space-x-3">
+              <i className="fas fa-comment-alt text-blue-400"></i>
+              <span className="font-medium">Live Transcription</span>
               {isTranscribing && (
-                <span className="ml-2 text-xs bg-green-500 px-2 py-1 rounded-full animate-pulse">
-                  Listening...
+                <span className="flex items-center space-x-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  <span className="text-green-400 text-sm">Listening...</span>
                 </span>
               )}
-            </h3>
-            <div className="flex space-x-2">
+            </div>
+            <i className={`fas fa-chevron-${showTranscript ? 'up' : 'down'} text-gray-400 transition-transform duration-200`}></i>
+          </button>
+          
+          <div className="px-4 pb-4">
+            <div className="flex justify-between items-center mb-3">
               {userRole === 'candidate' && (
                 <button
                   onClick={toggleTranscription}
-                  className={`px-3 py-1 rounded text-sm transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     transcriptionEnabled 
                       ? 'bg-red-500 hover:bg-red-600' 
                       : 'bg-green-500 hover:bg-green-600'
                   }`}
                 >
-                  <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} mr-1`}></i>
-                  {transcriptionEnabled ? 'Stop Transcription' : 'Start Transcription'}
+                  <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} mr-2`}></i>
+                  {transcriptionEnabled ? 'Stop' : 'Start'} Transcription
                 </button>
               )}
               <button
                 onClick={clearTranscript}
-                className="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-sm transition-colors"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors duration-200"
+                disabled={!transcript}
               >
-                <i className="fas fa-trash mr-1"></i>
+                <i className="fas fa-trash mr-2"></i>
                 Clear
               </button>
             </div>
-          </div>
-          <div className="bg-gray-900 rounded p-3 max-h-32 overflow-y-auto">
-            {transcript ? (
-              <p className="text-white text-sm leading-relaxed">{transcript}</p>
-            ) : (
-              <p className="text-gray-400 text-sm">
-                {userRole === 'candidate' 
-                  ? 'Start transcription to convert your speech to text in real-time...'
-                  : 'Waiting for candidate speech transcription...'
-                }
-              </p>
-            )}
+            
+            <div className="bg-gray-900 rounded-lg p-4 max-h-32 overflow-y-auto">
+              {transcript ? (
+                <p className="text-white text-sm leading-relaxed">{transcript}</p>
+              ) : (
+                <p className="text-gray-400 text-sm text-center py-4">
+                  {userRole === 'candidate' 
+                    ? 'Start transcription to convert your speech to text...'
+                    : 'Waiting for candidate speech transcription...'
+                  }
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Controls */}
-      <div className="flex space-x-4 bg-black bg-opacity-50 rounded-full px-6 py-3">
-        {/* Audio Toggle */}
-        <button
-          onClick={toggleAudio}
-          className={`p-3 rounded-full transition-all duration-300 ${
-            isAudioMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-600 hover:bg-gray-700'
-          }`}
-        >
-          <i className={`fas ${isAudioMuted ? 'fa-microphone-slash' : 'fa-microphone'} text-xl`}></i>
-        </button>
-
-        {/* Video Toggle */}
-        <button
-          onClick={toggleVideo}
-          className={`p-3 rounded-full transition-all duration-300 ${
-            isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-600 hover:bg-gray-700'
-          }`}
-        >
-          <i className={`fas ${isVideoOff ? 'fa-video-slash' : 'fa-video'} text-xl`}></i>
-        </button>
-
-        {/* Transcription Toggle (Candidate only) */}
-        {userRole === 'candidate' && (
+      {/* Controls - Fixed Bottom */}
+      <div className="bg-gray-800 bg-opacity-90 backdrop-blur-sm border-t border-gray-700 px-6 py-4">
+        <div className="flex justify-center items-center space-x-4 md:space-x-6">
+          {/* Audio Toggle */}
           <button
-            onClick={toggleTranscription}
-            className={`p-3 rounded-full transition-all duration-300 ${
-              transcriptionEnabled ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-600 hover:bg-gray-700'
+            onClick={toggleAudio}
+            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
+              isAudioMuted 
+                ? 'bg-red-500 hover:bg-red-600' 
+                : 'bg-gray-600 hover:bg-gray-500'
             }`}
-            title={transcriptionEnabled ? "Stop Transcription" : "Start Real-time Transcription"}
           >
-            <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} text-xl`}></i>
+            <i className={`fas ${isAudioMuted ? 'fa-microphone-slash' : 'fa-microphone'} text-xl mb-1`}></i>
+            <span className="text-xs mt-1">{isAudioMuted ? 'Unmute' : 'Mute'}</span>
           </button>
-        )}
 
-        {/* End Call */}
-        <button
-          onClick={endCall}
-          className="p-3 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-300"
-        >
-          <i className="fas fa-phone-slash text-xl"></i>
-        </button>
+          {/* Video Toggle */}
+          <button
+            onClick={toggleVideo}
+            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
+              isVideoOff 
+                ? 'bg-red-500 hover:bg-red-600' 
+                : 'bg-gray-600 hover:bg-gray-500'
+            }`}
+          >
+            <i className={`fas ${isVideoOff ? 'fa-video-slash' : 'fa-video'} text-xl mb-1`}></i>
+            <span className="text-xs mt-1">{isVideoOff ? 'Start Video' : 'Stop Video'}</span>
+          </button>
+
+          {/* Hide/Show Video Toggle */}
+          <button
+            onClick={toggleVideoHide}
+            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
+              isVideoHidden 
+                ? 'bg-purple-500 hover:bg-purple-600' 
+                : 'bg-gray-600 hover:bg-gray-500'
+            }`}
+          >
+            <i className={`fas ${isVideoHidden ? 'fa-eye' : 'fa-eye-slash'} text-xl mb-1`}></i>
+            <span className="text-xs mt-1">{isVideoHidden ? 'Show' : 'Hide'}</span>
+          </button>
+
+          {/* Transcription Toggle (Candidate only) */}
+          {userRole === 'candidate' && (
+            <button
+              onClick={toggleTranscription}
+              className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
+                transcriptionEnabled 
+                  ? 'bg-green-500 hover:bg-green-600' 
+                  : 'bg-gray-600 hover:bg-gray-500'
+              }`}
+            >
+              <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} text-xl mb-1`}></i>
+              <span className="text-xs mt-1">{transcriptionEnabled ? 'Stop' : 'Transcribe'}</span>
+            </button>
+          )}
+
+          {/* End Call - Larger and Centered */}
+          <button
+            onClick={endCall}
+            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-red-500 hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
+          >
+            <i className="fas fa-phone-slash text-xl mb-1"></i>
+            <span className="text-xs mt-1">End Call</span>
+          </button>
+
+          {/* Transcript Toggle (Interviewer only) */}
+          {userRole === 'interviewer' && (
+            <button
+              onClick={() => setShowTranscript(!showTranscript)}
+              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-600 hover:bg-gray-500 transition-all duration-300 transform hover:scale-105"
+            >
+              <i className="fas fa-comment-alt text-xl mb-1"></i>
+              <span className="text-xs mt-1">Transcript</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Status Info */}
-      <div className="mt-4 text-center text-gray-400 text-sm">
-        <p>Share the Room ID with others to let them join: <strong>{roomId}</strong></p>
-        <p className="mt-1">You will be redirected to your {userRole} dashboard when the call ends.</p>
+      {/* Mobile Optimization Notice */}
+      <div className="lg:hidden bg-blue-900 bg-opacity-20 px-4 py-2 text-center">
+        <p className="text-blue-300 text-sm">
+          {isVideoHidden 
+            ? "Your video is partially hidden. Click the eye button to show it fully." 
+            : "Tip: Drag your video to move it or hide it to the side"}
+        </p>
       </div>
     </div>
   );

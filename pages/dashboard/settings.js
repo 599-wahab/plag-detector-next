@@ -1,178 +1,120 @@
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import withAuth from '../../lib/withAuth';
-import Sidebar from '../../components/Sidebar';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import withAuth from "../../lib/withAuth";
+import Sidebar from "../../components/Sidebar";
+import Navbar from "../../components/Navbar";
 
-function Settings() {
+const SettingsPage = () => {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [profile, setProfile] = useState({
-    fullName: '',
-    phone: '',
-    address: '',
-    qualification: '',
-    recentStudied: '',
-    gender: '',
+  const [settings, setSettings] = useState({
+    notifications: true,
+    darkMode: false,
+    language: "English",
   });
-  const [loading, setLoading] = useState(false);
-
-  const sidebarItems = [
-    { id: 1, name: 'Home', icon: 'fas fa-tachometer-alt', path: '/dashboard/candidate' },
-    { id: 2, name: 'Profile', icon: 'fas fa-user-circle', path: '/dashboard/profile' },
-    { id: 3, name: 'Settings', icon: 'fas fa-cog', path: '/dashboard/settings' },
-  ];
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
-    const savedState = localStorage.getItem('sidebarCollapsed');
-    if (savedState === 'true') setSidebarCollapsed(true);
+    const savedSidebar = localStorage.getItem("sidebarCollapsed");
+    if (savedSidebar === "true") setSidebarCollapsed(true);
 
-    const userId = localStorage.getItem('userId');
-    if (userId) fetchProfile(userId);
+    const savedSettings = localStorage.getItem("userSettings");
+    if (savedSettings) setSettings(JSON.parse(savedSettings));
   }, []);
 
-  const fetchProfile = async (userId) => {
-    try {
-      const res = await fetch(`/api/get-profile?userId=${userId}`);
-      const data = await res.json();
-      if (data.success && data.profile) {
-        setProfile({
-          fullName: data.profile.fullName || '',
-          phone: data.profile.phone || '',
-          address: data.profile.address || '',
-          qualification: data.profile.qualification || '',
-          recentStudied: data.profile.recentStudied || '',
-          gender: data.profile.gender || '',
-        });
-      }
-    } catch (err) {
-      console.error('Failed to load profile:', err);
-    }
-  };
-
-  const handleChange = (e) => {
-    setProfile({ ...profile, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    const userId = localStorage.getItem('userId');
-
-    try {
-      const res = await fetch('/api/update-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, ...profile }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('Profile updated successfully!');
-      } else {
-        alert('Error updating profile: ' + data.error);
-      }
-    } catch (err) {
-      alert('Failed to update profile.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleSidebar = () => {
+  const handleToggleSidebar = () => {
     const newState = !sidebarCollapsed;
     setSidebarCollapsed(newState);
-    localStorage.setItem('sidebarCollapsed', newState.toString());
+    localStorage.setItem("sidebarCollapsed", newState.toString());
   };
 
   const handleLogout = () => {
     localStorage.clear();
-    router.push('/');
+    router.push("/");
+  };
+
+  const handleChange = (key, value) => {
+    setSettings({ ...settings, [key]: value });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSuccessMsg("");
+
+    // simulate API call
+    setTimeout(() => {
+      localStorage.setItem("userSettings", JSON.stringify(settings));
+      setSuccessMsg("Settings saved successfully!");
+      setSaving(false);
+    }, 1000);
   };
 
   return (
     <div className="min-h-screen bg-white pt-16">
+      <Navbar />
       <div className="flex">
-        {/* Sidebar Component */}
         <Sidebar
           sidebarCollapsed={sidebarCollapsed}
-          toggleSidebar={toggleSidebar}
+          toggleSidebar={handleToggleSidebar}
           handleLogout={handleLogout}
-          sidebarItems={sidebarItems}
-          userRole="candidate"
         />
-
-        {/* Main content */}
         <div
           className={`flex-1 transition-all duration-300 ${
-            sidebarCollapsed ? 'ml-20' : 'ml-72'
+            sidebarCollapsed ? "ml-20" : "ml-72"
           } p-6`}
         >
           <h1 className="text-3xl font-bold mb-6 text-black">Settings</h1>
+          <div className="bg-gray-100 rounded-xl p-6 border border-gray-300 max-w-3xl">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-medium">Notifications</span>
+                <input
+                  type="checkbox"
+                  checked={settings.notifications}
+                  onChange={(e) => handleChange("notifications", e.target.checked)}
+                />
+              </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="bg-gray-100 p-6 rounded-xl border border-gray-300 max-w-3xl"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                name="fullName"
-                value={profile.fullName}
-                onChange={handleChange}
-                placeholder="Full Name"
-                className="p-3 rounded-lg border border-gray-300"
-              />
-              <input
-                name="phone"
-                value={profile.phone}
-                onChange={handleChange}
-                placeholder="Phone"
-                className="p-3 rounded-lg border border-gray-300"
-              />
-              <input
-                name="qualification"
-                value={profile.qualification}
-                onChange={handleChange}
-                placeholder="Qualification"
-                className="p-3 rounded-lg border border-gray-300"
-              />
-              <input
-                name="recentStudied"
-                value={profile.recentStudied}
-                onChange={handleChange}
-                placeholder="Recent Studied"
-                className="p-3 rounded-lg border border-gray-300"
-              />
-              <select
-                name="gender"
-                value={profile.gender}
-                onChange={handleChange}
-                className="p-3 rounded-lg border border-gray-300"
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-medium">Dark Mode</span>
+                <input
+                  type="checkbox"
+                  checked={settings.darkMode}
+                  onChange={(e) => handleChange("darkMode", e.target.checked)}
+                />
+              </div>
+
+              <div>
+                <label className="text-lg font-medium block mb-2">Language</label>
+                <select
+                  value={settings.language}
+                  onChange={(e) => handleChange("language", e.target.value)}
+                  className="p-3 border border-gray-300 rounded-lg w-full"
+                >
+                  <option>English</option>
+                  <option>Urdu</option>
+                  <option>Arabic</option>
+                </select>
+              </div>
+
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all"
               >
-                <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-              <textarea
-                name="address"
-                value={profile.address}
-                onChange={handleChange}
-                placeholder="Address"
-                rows="3"
-                className="p-3 rounded-lg border border-gray-300 md:col-span-2"
-              ></textarea>
-            </div>
+                {saving ? "Saving..." : "Save Settings"}
+              </button>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-6 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-all"
-            >
-              {loading ? 'Updating...' : 'Update Profile'}
-            </button>
-          </form>
+              {successMsg && (
+                <p className="text-green-600 font-medium mt-2">{successMsg}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
-}
+};
 
-export default withAuth(Settings);
+export default withAuth(SettingsPage);

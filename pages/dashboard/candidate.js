@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import withAuth from '../../lib/withAuth';
 import Sidebar from '../../components/Sidebar';
+import Navbar from "../../components/Navbar";
+
 
 const CandidateDashboard = () => {
   const router = useRouter();
@@ -73,7 +75,9 @@ const CandidateDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white pt-16">
+    <div className="min-h-screen bg-white text-black pt-16">
+    {/* Navbar */}
+    <Navbar />
       <div className="flex">
         {/* Sidebar Component */}
         <Sidebar
