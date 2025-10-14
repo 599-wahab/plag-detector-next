@@ -1,139 +1,128 @@
 import { useState } from 'react';
-import Navbar from '../components/Navbar';
 import Router from 'next/router';
+import Navbar from '../components/Navbar';
+import '@/styles/AnimatedBackground.css';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  async function doLogin(e) {
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Enter a valid email';
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (formData.password.length < 6) newErrors.password = 'Must be 6+ characters';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const doLogin = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
-      alert('Please enter email and password');
-      return;
-    }
-    setLoading(true);
+    if (!validateForm()) return;
+    setIsLoading(true);
+
     try {
       const resp = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(formData),
       });
       const data = await resp.json();
-      if (resp.ok) {
-        // Save IDs and role (if returned)
-        if (data.userId) localStorage.setItem('userId', data.userId);
-        if (data.role) localStorage.setItem('role', data.role);
 
-        alert('Login OK');
-        // redirect based on role if available
-        if (data.role === 'candidate') Router.push('/dashboard/candidate');
-        else if (data.role === 'interviewer') Router.push('/dashboard/interviewer');
-        else Router.push('/');
+      if (resp.ok) {
+        localStorage.setItem('userId', data.userId || '');
+        localStorage.setItem('role', data.role || '');
+        const redirectPath =
+          data.role === 'interviewer'
+            ? '/dashboard/interviewer'
+            : data.role === 'candidate'
+            ? '/dashboard/candidate'
+            : '/';
+        Router.push(redirectPath);
       } else {
-        alert('Error: ' + (data.error || JSON.stringify(data)));
+        setErrors({ general: data.error || 'Invalid credentials' });
       }
     } catch (err) {
-      alert('Network error: ' + err.message);
+      setErrors({ general: 'Network error: ' + err.message });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <>
-      <div className="creative-bg pointer-events-none z-0">
-        <div className="floating-shapes">
-          <div className="shape shape-1"></div>
-          <div className="shape shape-2"></div>
-          <div className="shape shape-3"></div>
-          <div className="shape shape-4"></div>
-          <div className="shape shape-5"></div>
-        </div>
+      <Navbar />
+
+      <div className="animated-bg">
+        <div className="blob blob1"></div>
+        <div className="blob blob2"></div>
+        <div className="blob blob3"></div>
       </div>
 
-      <Navbar />
-      <div className="min-h-screen flex items-center justify-center pt-20 px-4">
-        <div className="login-container w-full max-w-lg glass-card rounded-2xl p-8 relative z-10">
-          <div className="card-decoration absolute top-0 left-0 right-0 h-2 overflow-hidden">
-            <div className="h-0.5 w-full bg-gradient-to-r from-pink-400 via-teal-300 to-sky-400 animate-pulse"></div>
-          </div>
-
-          <div className="login-header text-center mb-6">
-            <div className="creative-logo mx-auto mb-3 w-20 h-20 rounded-full flex items-center justify-center">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-yellow-400 animate-spin-slow"></div>
-            </div>
-            <h2 className="text-2xl font-extrabold text-gray-800 bg-clip-text text-transparent bg-gradient-to-br from-primaryFrom to-primaryTo">
-              Login Form
-            </h2>
-            <p className="text-gray-600 italic mt-1">Enter your Details</p>
-          </div>
-
-          <form onSubmit={doLogin} className="space-y-5">
-            <div className="form-group">
-              <div className="input-wrapper">
-                <input
-                  className="w-full rounded-xl px-4 py-4 text-gray-800 outline-none"
-                  type="email"
-                  placeholder="Email address"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                />
-                <div className="input-decoration mt-2 h-1 rounded-full"></div>
+      <div className="min-h-screen flex items-center justify-center bg-transparent pt-16 px-4">
+        <div className="max-w-md w-full relative">
+          <div className="relative backdrop-blur-md bg-white/70 rounded-2xl shadow-2xl border border-gray-200 p-8 z-10">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i className="fas fa-shield-alt text-white text-2xl"></i>
               </div>
+              <h2 className="text-3xl font-bold text-black mb-2">Welcome Back</h2>
+              <p className="text-gray-600">Enter your details to continue</p>
             </div>
 
-            <div className="form-group relative">
-              <div className="input-wrapper">
-                <input
-                  className="w-full rounded-xl px-4 py-4 text-gray-800 outline-none"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                />
-                <div className="input-decoration mt-2 h-1 rounded-full"></div>
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(s => !s)}
-                  className="absolute right-4 top-4 text-gray-500"
-                  aria-label="Toggle password"
-                >
-                  {showPassword ? 'Hide' : 'Show'}
+            <form onSubmit={doLogin} className="space-y-6">
+              <div>
+                <input type="email" name="email" value={formData.email} onChange={handleChange}
+                  placeholder="Email Address"
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 shadow-sm ${
+                    errors.email ? 'border-red-400' : ''
+                  }`} />
+                {errors.email && <p className="mt-2 text-sm text-red-500">{errors.email}</p>}
+              </div>
+
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password}
+                  onChange={handleChange} placeholder="Password"
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 shadow-sm ${
+                    errors.password ? 'border-red-400' : ''
+                  }`} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-black">
+                  <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                 </button>
+                {errors.password && <p className="mt-2 text-sm text-red-500">{errors.password}</p>}
               </div>
-            </div>
 
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 text-gray-700">
-                <input type="checkbox" className="w-4 h-4" />
-                Remember Me
-              </label>
-              <a className="text-primaryFrom font-semibold hover:underline" href="#">Forgot password?</a>
-            </div>
+              {errors.general && (
+                <div className="bg-red-100 border border-red-300 rounded-lg p-3">
+                  <p className="text-red-500 text-sm">{errors.general}</p>
+                </div>
+              )}
 
-            <button
-              type="submit"
-              className={`login-btn relative w-full rounded-xl py-4 font-semibold text-white login-btn ${loading ? 'loading' : ''}`}
-              disabled={loading}
-            >
-              <span className="btn-bg"></span>
-              <span className="btn-text">Enter Advance Interview Era</span>
-              <span className="btn-loader">
-                <span className="inline-block w-2 h-2 rounded-full bg-white animate-bounce mr-1"></span>
-                <span className="inline-block w-2 h-2 rounded-full bg-white animate-bounce delay-200 mr-1"></span>
-                <span className="inline-block w-2 h-2 rounded-full bg-white animate-bounce delay-400"></span>
-              </span>
-            </button>
+              <button type="submit" disabled={isLoading}
+                className="w-full rainbow-btn py-3 px-6 rounded-lg font-semibold text-black transition-all duration-300">
+                {isLoading ? 'Signing In...' : 'Enter Advanced Interview Era'}
+              </button>
+            </form>
 
-            <div className="text-center text-sm text-gray-600">
-              New here? <a href="/signup" className="text-primaryFrom font-medium">Signup first</a>
+            <div className="mt-6 text-center">
+              <p className="text-gray-600">
+                New Here?{' '}
+                <a href="/signup" className="text-black font-semibold hover:underline">
+                  Signup First
+                </a>
+              </p>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     </>

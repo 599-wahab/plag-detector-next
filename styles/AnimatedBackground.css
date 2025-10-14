@@ -1,0 +1,110 @@
+/* styles/AnimatedBackground.css */
+.animated-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: -1;
+  background: radial-gradient(circle at 20% 30%, #ffffff, #f4f4f8);
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.45;
+  filter: blur(60px);
+  animation: float 18s ease-in-out infinite;
+}
+
+.blob1 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle at 30% 30%, #6a11cb, #2575fc);
+  top: -80px;
+  left: -120px;
+  animation-delay: 0s;
+}
+
+.blob2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle at 70% 70%, #ff7eb3, #ff758c);
+  bottom: -100px;
+  right: -100px;
+  animation-delay: 3s;
+}
+
+.blob3 {
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle at 40% 40%, #43cea2, #185a9d);
+  top: 50%;
+  left: 60%;
+  transform: translate(-50%, -50%);
+  animation-delay: 6s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -40px) scale(1.1);
+  }
+}
+
+/* Animated gradient border for buttons */
+.rainbow-btn {
+  position: relative;
+  border: none;
+  color: white;
+  font-weight: 600;
+  background: #000;
+  overflow: hidden;
+  z-index: 0;
+  transition: color 0.3s ease;
+}
+
+.rainbow-btn::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(
+    270deg,
+    #ff0000,
+    #ff7300,
+    #fffb00,
+    #48ff00,
+    #00ffd5,
+    #002bff,
+    #7a00ff,
+    #ff00ab,
+    #ff0000
+  );
+  background-size: 400% 400%;
+  animation: rainbowMove 6s linear infinite;
+  z-index: -1;
+  border-radius: inherit;
+}
+
+.rainbow-btn::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: white;
+  border-radius: inherit;
+  z-index: -1;
+}
+
+.rainbow-btn:hover {
+  color: white;
+}
+
+.rainbow-btn:hover::after {
+  background: black;
+}
+
+@keyframes rainbowMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import withAuth from '../../lib/withAuth';
+import Sidebar from '../../components/Sidebar';
 
 function InterviewerDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -15,6 +16,14 @@ function InterviewerDashboard() {
   const [user, setUser] = useState(null);
 
   const router = useRouter();
+
+  const sidebarItems = [
+    { id: 1, name: 'Dashboard', icon: 'fas fa-tachometer-alt', path: '/dashboard/interviewer' },
+    { id: 3, name: 'Report', icon: 'fas fa-chart-line', path: '/dashboard/report' },
+    { id: 4, name: 'Plagiarism Detection', icon: 'fas fa-search-plus', path: '/dashboard/plagiarism' },
+    { id: 5, name: 'Profile', icon: 'fas fa-user-circle', path: '/dashboard/profile' },
+    { id: 6, name: 'Settings', icon: 'fas fa-cog', path: '/dashboard/settings' },
+  ];
 
   // ✅ Load sidebar + user data
   useEffect(() => {
@@ -105,66 +114,6 @@ function InterviewerDashboard() {
     }
   };
 
-  // ✅ Cancel interview
-  const cancelInterview = async (candidateId) => {
-    try {
-      const res = await fetch('/api/update-interview-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: candidateId, status: 'Cancelled' }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('Interview status updated to Cancelled');
-        fetchScheduledInterviews();
-      } else alert('Failed to cancel interview: ' + data.error);
-    } catch (err) {
-      alert('Error cancelling interview: ' + err.message);
-    }
-  };
-
-  // ✅ Mark interview as completed
-  const completeInterview = async (candidateId) => {
-    try {
-      const res = await fetch('/api/update-interview-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: candidateId, status: 'Completed' }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('Interview status updated to Completed');
-        fetchScheduledInterviews();
-      } else alert('Failed to complete interview: ' + data.error);
-    } catch (err) {
-      alert('Error completing interview: ' + err.message);
-    }
-  };
-
-  // ✅ Edit interview time
-  const editInterview = async (candidateId, newDate) => {
-    try {
-      const res = await fetch('/api/update-interview-time', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: candidateId, scheduledAt: newDate.toISOString() }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('Interview time updated successfully');
-        setEditingRow(null);
-        fetchScheduledInterviews();
-      } else alert('Failed to update interview time: ' + data.error);
-    } catch (err) {
-      alert('Error updating interview time: ' + err.message);
-    }
-  };
-
-  // ✅ Helper: check if interview scheduled
-  const isInterviewScheduled = (candidateId) => {
-    return scheduledInterviews.some((i) => i.userId === candidateId);
-  };
-
   // ✅ Dashboard cards
   const dashboardCards = [
     {
@@ -201,72 +150,17 @@ function InterviewerDashboard() {
     },
   ];
 
-  const sidebarItems = [
-    { id: 1, name: 'Dashboard', icon: 'fas fa-tachometer-alt', active: true },
-    { id: 3, name: 'Report', icon: 'fas fa-chart-line', active: false },
-    { id: 4, name: 'Plagiarism Detection', icon: 'fas fa-search-plus', active: false },
-    { id: 5, name: 'Profile', icon: 'fas fa-user-circle', active: false },
-    { id: 6, name: 'Settings', icon: 'fas fa-cog', active: false },
-  ];
-
   return (
     <div className="min-h-screen bg-white text-black pt-16">
       <div className="flex">
-        {/* Sidebar */}
-        <div
-          className={`${
-            sidebarCollapsed ? 'w-20' : 'w-72'
-          } bg-gray-100 backdrop-blur-md border-r border-gray-300 transition-all duration-300 min-h-screen fixed left-0 top-16 z-40`}
-        >
-          <div className="p-4 flex flex-col h-full">
-            <button
-              onClick={toggleSidebar}
-              className="w-full flex items-center justify-center p-2 text-black hover:bg-gray-200 rounded-lg transition-colors mb-4"
-            >
-              <i
-                className={`fas fa-bars text-xl ${
-                  sidebarCollapsed ? 'rotate-90' : ''
-                } transition-transform`}
-              ></i>
-            </button>
-
-            <nav className="space-y-2 flex-1">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.id}
-                  className={`w-full flex items-center ${
-                    sidebarCollapsed ? 'justify-center px-2' : 'px-4'
-                  } py-3 text-black hover:bg-gray-200 rounded-lg transition-all duration-300 ${
-                    item.active ? 'bg-gray-300 shadow-lg' : ''
-                  }`}
-                >
-                  <i
-                    className={`${item.icon} ${
-                      sidebarCollapsed ? 'text-xl' : 'mr-3'
-                    } ${sidebarCollapsed ? '' : 'w-6'}`}
-                  ></i>
-                  {!sidebarCollapsed && <span className="font-medium">{item.name}</span>}
-                </button>
-              ))}
-            </nav>
-
-            <div className="mt-auto pt-4">
-              <button
-                onClick={handleLogout}
-                className={`w-full flex items-center ${
-                  sidebarCollapsed ? 'justify-center px-2' : 'px-4'
-                } py-3 text-red-600 hover:bg-red-100 rounded-lg transition-all duration-300 border border-red-300`}
-              >
-                <i
-                  className={`fas fa-sign-out-alt ${
-                    sidebarCollapsed ? 'text-xl' : 'mr-3'
-                  } ${sidebarCollapsed ? '' : 'w-6'}`}
-                ></i>
-                {!sidebarCollapsed && <span className="font-medium">Logout</span>}
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Sidebar Component */}
+        <Sidebar
+          sidebarCollapsed={sidebarCollapsed}
+          toggleSidebar={toggleSidebar}
+          handleLogout={handleLogout}
+          sidebarItems={sidebarItems}
+          userRole="interviewer"
+        />
 
         {/* Main content */}
         <div
@@ -298,8 +192,8 @@ function InterviewerDashboard() {
             ))}
           </div>
 
-          {/* ✅ Your Scheduled Interviews table and Candidate modal remain unchanged below */}
-          {/* You can keep your entire table and modal JSX from your previous code here */}
+          {/* Your existing table and modal content can remain here */}
+          {/* ... rest of your interviewer-specific content ... */}
         </div>
       </div>
     </div>

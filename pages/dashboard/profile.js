@@ -1,7 +1,7 @@
-// pages/dashboard/profile.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import withAuth from '../../lib/withAuth';
+import Sidebar from '../../components/Sidebar';
 
 const ProfilePage = () => {
   const router = useRouter();
@@ -17,6 +17,12 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  const sidebarItems = [
+    { id: 1, name: 'Home', icon: 'fas fa-tachometer-alt', path: '/dashboard/candidate' },
+    { id: 2, name: 'Profile', icon: 'fas fa-user-circle', path: '/dashboard/profile' },
+    { id: 3, name: 'Settings', icon: 'fas fa-cog', path: '/dashboard/settings' },
+  ];
 
   useEffect(() => {
     const savedState = localStorage.getItem('sidebarCollapsed');
@@ -85,71 +91,14 @@ const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-white pt-16">
       <div className="flex">
-        {/* Sidebar */}
-        <div
-          className={`${
-            sidebarCollapsed ? 'w-20' : 'w-72'
-          } bg-white/90 backdrop-blur-md border-r border-gray-300 transition-all duration-300 min-h-screen fixed left-0 top-16 z-40`}
-        >
-          <div className="p-4 flex flex-col h-full">
-            <button
-              onClick={toggleSidebar}
-              className="w-full flex items-center justify-center p-2 text-black hover:bg-gray-200 rounded-lg transition-colors mb-4"
-            >
-              <i
-                className={`fas fa-bars text-xl ${
-                  sidebarCollapsed ? 'rotate-90' : ''
-                } transition-transform`}
-              ></i>
-            </button>
-
-            <nav className="space-y-2 flex-1">
-              <button
-                onClick={() => router.push('/dashboard/candidate')}
-                className={`w-full flex items-center ${
-                  sidebarCollapsed ? 'justify-center px-2' : 'px-4'
-                } py-3 text-black hover:bg-gray-200 rounded-lg`}
-              >
-                <i
-                  className={`fas fa-tachometer-alt ${
-                    sidebarCollapsed ? 'text-xl' : 'mr-3'
-                  }`}
-                ></i>
-                {!sidebarCollapsed && <span>Dashboard</span>}
-              </button>
-
-              <button
-                onClick={() => router.push('/dashboard/profile')}
-                className={`w-full flex items-center ${
-                  sidebarCollapsed ? 'justify-center px-2' : 'px-4'
-                } py-3 text-black bg-gray-100 rounded-lg`}
-              >
-                <i
-                  className={`fas fa-user-circle ${
-                    sidebarCollapsed ? 'text-xl' : 'mr-3'
-                  }`}
-                ></i>
-                {!sidebarCollapsed && <span>Profile</span>}
-              </button>
-            </nav>
-
-            <div className="pt-4">
-              <button
-                onClick={handleLogout}
-                className={`w-full flex items-center ${
-                  sidebarCollapsed ? 'justify-center px-2' : 'px-4'
-                } py-3 text-red-600 hover:bg-red-100 rounded-lg border border-red-300`}
-              >
-                <i
-                  className={`fas fa-sign-out-alt ${
-                    sidebarCollapsed ? 'text-xl' : 'mr-3'
-                  }`}
-                ></i>
-                {!sidebarCollapsed && <span>Logout</span>}
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Sidebar Component */}
+        <Sidebar
+          sidebarCollapsed={sidebarCollapsed}
+          toggleSidebar={toggleSidebar}
+          handleLogout={handleLogout}
+          sidebarItems={sidebarItems}
+          userRole="candidate"
+        />
 
         {/* Main Content */}
         <div
