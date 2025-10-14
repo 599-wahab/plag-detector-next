@@ -19,12 +19,17 @@ export default function MeetingPage() {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("Connecting...");
+  const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
     if (!roomId) return;
 
+    // Get user role from localStorage
+    const role = localStorage.getItem('role');
+    setUserRole(role);
+
     // Connect to the signaling server
-    socket = io("https://plag-detector-next.onrender.com"); // <-- your Render URL
+    socket = io("https://plag-detector-next.onrender.com");
 
     const pc = new RTCPeerConnection({
       iceServers: [
@@ -167,7 +172,7 @@ export default function MeetingPage() {
     }
   };
 
-  // End call and leave meeting
+  // End call and leave meeting - redirect to appropriate dashboard
   const endCall = () => {
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
@@ -178,7 +183,17 @@ export default function MeetingPage() {
     if (socket) {
       socket.disconnect();
     }
-    router.push('/dashboard');
+
+    // Redirect to appropriate dashboard based on user role
+    const role = localStorage.getItem('role');
+    if (role === 'interviewer') {
+      router.push('/dashboard/interviewer');
+    } else if (role === 'candidate') {
+      router.push('/dashboard/candidate');
+    } else {
+      // Fallback to home if no role found
+      router.push('/');
+    }
   };
 
   // Copy room ID to clipboard
@@ -207,6 +222,9 @@ export default function MeetingPage() {
               <i className="fas fa-copy mr-1"></i>
               Copy ID
             </button>
+            <span className="text-sm text-gray-300">
+              ({userRole || 'Guest'})
+            </span>
           </div>
         </div>
       </div>
@@ -284,6 +302,7 @@ export default function MeetingPage() {
       {/* Status Info */}
       <div className="mt-4 text-center text-gray-400 text-sm">
         <p>Share the Room ID with others to let them join: <strong>{roomId}</strong></p>
+        <p className="mt-1">You will be redirected to your {userRole} dashboard when the call ends.</p>
       </div>
     </div>
   );
