@@ -31,12 +31,54 @@ export default function MeetingPage() {
   const [transcript, setTranscript] = useState("");
   const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showControls, setShowControls] = useState(true);
 
   // Draggable video state
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isVideoHidden, setIsVideoHidden] = useState(false);
+
+  // Check if mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Auto-hide controls on mobile after 3 seconds
+  useEffect(() => {
+    if (!isMobile) return;
+
+    let timeoutId;
+    const resetTimer = () => {
+      setShowControls(true);
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => setShowControls(false), 3000);
+    };
+
+    const handleInteraction = () => {
+      resetTimer();
+    };
+
+    resetTimer();
+
+    window.addEventListener('mousemove', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    window.addEventListener('click', handleInteraction);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousemove', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('click', handleInteraction);
+    };
+  }, [isMobile]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -84,9 +126,10 @@ export default function MeetingPage() {
     navigator.mediaDevices
       .getUserMedia({ 
         video: { 
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 }
+          width: { ideal: isMobile ? 1280 : 1920 },
+          height: { ideal: isMobile ? 720 : 1080 },
+          frameRate: { ideal: 30 },
+          facingMode: isMobile ? "user" : "environment"
         }, 
         audio: { 
           echoCancellation: true,
@@ -192,15 +235,15 @@ export default function MeetingPage() {
       }
     };
 
-    // Set initial position for local video (bottom right corner)
-    setPosition({ x: 20, y: 20 });
+    // Set initial position for local video
+    setPosition({ x: 16, y: 16 });
 
     setJoined(true);
 
     return () => {
       cleanupMedia();
     };
-  }, [roomId]);
+  }, [roomId, isMobile]);
 
   // Cleanup media resources
   const cleanupMedia = () => {
@@ -256,7 +299,7 @@ export default function MeetingPage() {
         const videoRect = localVideoContainerRef.current.getBoundingClientRect();
         
         // Position so only 40px is visible on the right edge
-        const hiddenX = containerRect.width - 40;
+        const hiddenX = containerRect.width - (isMobile ? 32 : 40);
         const currentY = position.y;
         
         setPosition({ x: hiddenX, y: currentY });
@@ -267,7 +310,7 @@ export default function MeetingPage() {
 
   // Draggable video handlers
   const handleMouseDown = (e) => {
-    if (isVideoHidden) return; // Don't allow dragging when hidden
+    if (isVideoHidden) return;
     e.preventDefault();
     setIsDragging(true);
     const rect = localVideoContainerRef.current.getBoundingClientRect();
@@ -278,7 +321,7 @@ export default function MeetingPage() {
   };
 
   const handleTouchStart = (e) => {
-    if (isVideoHidden) return; // Don't allow dragging when hidden
+    if (isVideoHidden) return;
     const touch = e.touches[0];
     setIsDragging(true);
     const rect = localVideoContainerRef.current.getBoundingClientRect();
@@ -297,14 +340,14 @@ export default function MeetingPage() {
     const containerRect = container.getBoundingClientRect();
     const videoRect = localVideoContainerRef.current.getBoundingClientRect();
     
-    const x = Math.max(0, Math.min(
+    const x = Math.max(8, Math.min(
       e.clientX - dragOffset.x,
-      containerRect.width - videoRect.width
+      containerRect.width - videoRect.width - 8
     ));
     
-    const y = Math.max(0, Math.min(
+    const y = Math.max(8, Math.min(
       e.clientY - dragOffset.y,
-      containerRect.height - videoRect.height
+      containerRect.height - videoRect.height - 8
     ));
 
     setPosition({ x, y });
@@ -320,14 +363,14 @@ export default function MeetingPage() {
     const containerRect = container.getBoundingClientRect();
     const videoRect = localVideoContainerRef.current.getBoundingClientRect();
     
-    const x = Math.max(0, Math.min(
+    const x = Math.max(8, Math.min(
       touch.clientX - dragOffset.x,
-      containerRect.width - videoRect.width
+      containerRect.width - videoRect.width - 8
     ));
     
-    const y = Math.max(0, Math.min(
+    const y = Math.max(8, Math.min(
       touch.clientY - dragOffset.y,
-      containerRect.height - videoRect.height
+      containerRect.height - videoRect.height - 8
     ));
 
     setPosition({ x, y });
@@ -554,7 +597,11 @@ export default function MeetingPage() {
   // Copy room ID to clipboard
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId);
-    alert(`Room ID ${roomId} copied to clipboard!`);
+    // Show toast instead of alert
+    const event = new CustomEvent('showToast', { 
+      detail: { message: `Room ID ${roomId} copied!`, type: 'success' } 
+    });
+    window.dispatchEvent(event);
   };
 
   // Clear transcript
@@ -562,38 +609,72 @@ export default function MeetingPage() {
     setTranscript("");
   };
 
+  // Get connection status color
+  const getStatusColor = () => {
+    switch (connectionStatus) {
+      case "Connected": return "bg-green-500";
+      case "Connecting...":
+      case "Joining room...":
+      case "Creating offer...":
+      case "Offer sent":
+      case "Received offer, creating answer...":
+      case "Answer sent":
+      case "Received answer": return "bg-yellow-500";
+      default: return connectionStatus.includes("Error") ? "bg-red-500" : "bg-yellow-500";
+    }
+  };
+
+  // Get status text
+  const getStatusText = () => {
+    if (connectionStatus === "Connected") return "Connected";
+    if (connectionStatus.includes("Error")) return "Connection Error";
+    return "Connecting...";
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-gray-900 text-white">
-      {/* Header - Compact */}
-      <div className="bg-gray-800 bg-opacity-90 backdrop-blur-sm border-b border-gray-700 px-4 py-3">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className={`w-3 h-3 rounded-full ${
-              connectionStatus === "Connected" ? "bg-green-500" : 
-              connectionStatus.includes("Error") ? "bg-red-500" : "bg-yellow-500"
-            }`}></div>
-            <h1 className="text-lg font-semibold">Meeting Room</h1>
-            <span className="text-sm text-gray-300 bg-gray-700 px-2 py-1 rounded">
-              {roomId}
-            </span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <span className="text-sm text-gray-300 capitalize">
-              {userRole || 'guest'}
-            </span>
-            <button
-              onClick={copyRoomId}
-              className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm transition-colors duration-200"
-            >
-              <i className="fas fa-copy mr-1"></i>
-              Copy ID
-            </button>
+    <div className="flex flex-col min-h-screen bg-gray-900 text-white relative">
+      {/* Modern Header */}
+      <div className={`bg-gray-900/95 backdrop-blur-xl border-b border-gray-700/50 transition-all duration-300 ${
+        showControls ? 'translate-y-0' : '-translate-y-full'
+      }`}>
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${getStatusColor()} animate-pulse`}></div>
+                <span className="text-sm font-medium text-gray-200">{getStatusText()}</span>
+              </div>
+              <div className="h-4 w-px bg-gray-600"></div>
+              <span className="text-sm text-gray-400">Room: </span>
+              <button
+                onClick={copyRoomId}
+                className="flex items-center space-x-1 bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded-lg text-xs transition-colors duration-200 group"
+              >
+                <code className="text-gray-200 font-mono">{roomId}</code>
+                <i className="fas fa-copy text-gray-400 group-hover:text-blue-400 text-xs"></i>
+              </button>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded-full capitalize">
+                {userRole || 'guest'}
+              </span>
+              <button
+                onClick={() => setShowControls(!showControls)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg transition-colors md:hidden"
+              >
+                <i className={`fas ${showControls ? 'fa-chevron-up' : 'fa-chevron-down'} text-sm`}></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Video Area */}
-      <div className="flex-1 relative bg-black overflow-hidden main-video-container">
+      <div 
+        className="flex-1 relative bg-black overflow-hidden main-video-container"
+        onClick={() => isMobile && setShowControls(!showControls)}
+      >
         {/* Remote Video - Main Participant (Full Screen) */}
         <div className="absolute inset-0">
           <video 
@@ -603,33 +684,49 @@ export default function MeetingPage() {
             className="w-full h-full object-cover"
           />
           {!hasRemoteVideo && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800">
+              <div className="text-center px-6">
+                <div className="w-24 h-24 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl">
                   <i className="fas fa-user text-3xl text-gray-400"></i>
                 </div>
-                <p className="text-gray-400 text-lg">Waiting for participant to join...</p>
-                <p className="text-gray-500 text-sm mt-2">Share the Room ID: <strong>{roomId}</strong></p>
+                <h3 className="text-xl font-semibold text-gray-300 mb-2">
+                  Waiting for participant
+                </h3>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">
+                  Share the Room ID <strong className="text-blue-400">{roomId}</strong> with others to let them join
+                </p>
+                <div className="mt-6 flex justify-center space-x-3">
+                  <button
+                    onClick={copyRoomId}
+                    className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    <i className="fas fa-copy text-xs"></i>
+                    <span>Copy ID</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
-          <div className="absolute bottom-4 left-4 bg-black bg-opacity-60 backdrop-blur-sm px-3 py-2 rounded-lg">
-            <span className="text-white text-sm">Participant</span>
+          <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-2 rounded-xl border border-gray-600/50">
+            <span className="text-white text-sm font-medium flex items-center space-x-2">
+              <i className="fas fa-user text-blue-400"></i>
+              <span>Participant</span>
+            </span>
           </div>
         </div>
 
-        {/* Local Video - Draggable Overlay */}
+        {/* Local Video - Modern Draggable Overlay */}
         <div
           ref={localVideoContainerRef}
-          className={`absolute w-64 h-48 md:w-80 md:h-60 bg-black rounded-xl overflow-hidden border-2 transition-all duration-300 ${
+          className={`absolute bg-black rounded-2xl overflow-hidden border-2 transition-all duration-300 ${
             isVideoHidden 
-              ? 'border-purple-400 border-opacity-60' 
+              ? 'border-purple-500/60 shadow-lg' 
               : isDragging 
-                ? 'border-blue-400 border-opacity-80' 
-                : 'border-white border-opacity-20'
-          } shadow-2xl ${
-            isVideoHidden ? 'cursor-default opacity-80' : 'cursor-move'
-          } ${isDragging ? 'scale-105 z-50' : 'scale-100 z-40'}`}
+                ? 'border-blue-500/80 shadow-2xl scale-105' 
+                : 'border-white/20 shadow-xl'
+          } ${isVideoHidden ? 'cursor-default' : 'cursor-move'} ${
+            isMobile ? 'w-32 h-48' : 'w-48 h-36 md:w-64 md:h-48'
+          }`}
           style={{
             left: `${position.x}px`,
             top: `${position.y}px`,
@@ -646,193 +743,224 @@ export default function MeetingPage() {
             className="w-full h-full object-cover pointer-events-none"
           />
           {isVideoOff && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-80">
-              <i className="fas fa-video-slash text-2xl text-gray-400"></i>
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm">
+              <div className="text-center">
+                <i className="fas fa-video-slash text-2xl text-gray-400 mb-2"></i>
+                <p className="text-gray-400 text-xs">Camera Off</p>
+              </div>
             </div>
           )}
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 backdrop-blur-sm px-2 py-1 rounded text-sm">
-            You {isVideoOff && "(Video Off)"}
-          </div>
           
-          {/* Drag Handle - Only show when not hidden */}
-          {!isVideoHidden && (
-            <div className="absolute top-2 right-2 bg-black bg-opacity-60 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-300">
-              <i className="fas fa-arrows-alt mr-1"></i>
-              Drag
+          {/* Overlay Info */}
+          <div className="absolute bottom-2 left-2 right-2">
+            <div className="bg-black/60 backdrop-blur-sm rounded-lg px-2 py-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-white text-xs font-medium flex items-center space-x-1">
+                  <i className="fas fa-user text-green-400 text-xs"></i>
+                  <span>You {isVideoOff && "(Off)"}</span>
+                </span>
+                <div className="flex items-center space-x-1">
+                  {!isVideoHidden && (
+                    <div className="bg-black/40 rounded px-1.5 py-0.5">
+                      <i className="fas fa-arrows-alt text-gray-300 text-xs"></i>
+                    </div>
+                  )}
+                  <div className={`rounded px-1.5 py-0.5 ${
+                    isVideoHidden ? 'bg-purple-500/20' : 'bg-black/40'
+                  }`}>
+                    <i className={`fas ${isVideoHidden ? 'fa-eye' : 'fa-eye-slash'} text-xs ${
+                      isVideoHidden ? 'text-purple-400' : 'text-gray-300'
+                    }`}></i>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
-
-          {/* Hide/Show Indicator */}
-          <div className="absolute top-2 left-2 bg-black bg-opacity-60 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-300">
-            <i className={`fas ${isVideoHidden ? 'fa-eye' : 'fa-eye-slash'} mr-1`}></i>
-            {isVideoHidden ? 'Hidden' : 'Visible'}
           </div>
         </div>
 
-        {/* Connection Status Overlay */}
-        {connectionStatus !== "Connected" && (
-          <div className="absolute top-4 right-4 bg-black bg-opacity-70 backdrop-blur-sm px-4 py-2 rounded-lg">
+        {/* Connection Status Overlay - Mobile Only */}
+        {isMobile && connectionStatus !== "Connected" && (
+          <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-sm px-3 py-2 rounded-xl border border-gray-600/50">
             <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${
-                connectionStatus === "Connected" ? "bg-green-500" : 
-                connectionStatus.includes("Error") ? "bg-red-500" : "bg-yellow-500"
-              }`}></div>
-              <span className="text-sm">{connectionStatus}</span>
+              <div className={`w-2 h-2 rounded-full animate-pulse ${getStatusColor()}`}></div>
+              <span className="text-xs text-gray-200">{connectionStatus}</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Transcript Panel - Collapsible */}
+      {/* Modern Transcript Panel */}
       {(userRole === 'interviewer' || transcriptionEnabled) && (
-        <div className={`bg-gray-800 border-t border-gray-700 transition-all duration-300 ${
-          showTranscript ? 'max-h-64' : 'max-h-12'
-        } overflow-hidden`}>
+        <div className={`bg-gray-800/95 backdrop-blur-xl border-t border-gray-700/50 transition-all duration-300 ${
+          showTranscript ? 'max-h-80' : 'max-h-14'
+        } overflow-hidden ${showControls ? 'translate-y-0' : 'translate-y-full'}`}>
           <button
             onClick={() => setShowTranscript(!showTranscript)}
-            className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-750 transition-colors duration-200"
+            className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-750/50 transition-colors duration-200 group"
           >
             <div className="flex items-center space-x-3">
-              <i className="fas fa-comment-alt text-blue-400"></i>
-              <span className="font-medium">Live Transcription</span>
-              {isTranscribing && (
-                <span className="flex items-center space-x-1">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  <span className="text-green-400 text-sm">Listening...</span>
-                </span>
-              )}
+              <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <i className="fas fa-comment-alt text-blue-400 text-sm"></i>
+              </div>
+              <div className="text-left">
+                <span className="font-medium text-gray-100">Live Transcription</span>
+                {isTranscribing && (
+                  <div className="flex items-center space-x-1 mt-1">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                    <span className="text-green-400 text-xs">Active</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <i className={`fas fa-chevron-${showTranscript ? 'up' : 'down'} text-gray-400 transition-transform duration-200`}></i>
-          </button>
-          
-          <div className="px-4 pb-4">
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center space-x-2">
               {userRole === 'candidate' && (
                 <button
-                  onClick={toggleTranscription}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleTranscription();
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                     transcriptionEnabled 
                       ? 'bg-red-500 hover:bg-red-600' 
                       : 'bg-green-500 hover:bg-green-600'
                   }`}
                 >
-                  <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} mr-2`}></i>
-                  {transcriptionEnabled ? 'Stop' : 'Start'} Transcription
+                  <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} mr-1`}></i>
+                  {transcriptionEnabled ? 'Stop' : 'Start'}
                 </button>
               )}
-              <button
-                onClick={clearTranscript}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors duration-200"
-                disabled={!transcript}
-              >
-                <i className="fas fa-trash mr-2"></i>
-                Clear
-              </button>
+              <i className={`fas fa-chevron-${showTranscript ? 'up' : 'down'} text-gray-400 transition-transform duration-200 group-hover:text-white`}></i>
+            </div>
+          </button>
+          
+          <div className="px-4 pb-4">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={clearTranscript}
+                  disabled={!transcript}
+                  className="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-200"
+                >
+                  <i className="fas fa-trash text-xs"></i>
+                  <span>Clear</span>
+                </button>
+                {transcript && (
+                  <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
+                    {transcript.split(' ').length} words
+                  </span>
+                )}
+              </div>
             </div>
             
-            <div className="bg-gray-900 rounded-lg p-4 max-h-32 overflow-y-auto">
+            <div className="bg-gray-900/50 rounded-xl p-4 max-h-32 overflow-y-auto backdrop-blur-sm border border-gray-700/50">
               {transcript ? (
-                <p className="text-white text-sm leading-relaxed">{transcript}</p>
+                <p className="text-gray-100 text-sm leading-relaxed whitespace-pre-wrap">{transcript}</p>
               ) : (
-                <p className="text-gray-400 text-sm text-center py-4">
-                  {userRole === 'candidate' 
-                    ? 'Start transcription to convert your speech to text...'
-                    : 'Waiting for candidate speech transcription...'
-                  }
-                </p>
+                <div className="text-center py-4">
+                  <i className="fas fa-microphone-slash text-gray-500 text-lg mb-2"></i>
+                  <p className="text-gray-400 text-sm">
+                    {userRole === 'candidate' 
+                      ? 'Start transcription to convert your speech to text...'
+                      : 'Waiting for candidate speech transcription...'
+                    }
+                  </p>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Controls - Fixed Bottom */}
-      <div className="bg-gray-800 bg-opacity-90 backdrop-blur-sm border-t border-gray-700 px-6 py-4">
-        <div className="flex justify-center items-center space-x-4 md:space-x-6">
-          {/* Audio Toggle */}
-          <button
-            onClick={toggleAudio}
-            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
-              isAudioMuted 
-                ? 'bg-red-500 hover:bg-red-600' 
-                : 'bg-gray-600 hover:bg-gray-500'
-            }`}
-          >
-            <i className={`fas ${isAudioMuted ? 'fa-microphone-slash' : 'fa-microphone'} text-xl mb-1`}></i>
-            <span className="text-xs mt-1">{isAudioMuted ? 'Unmute' : 'Mute'}</span>
-          </button>
-
-          {/* Video Toggle */}
-          <button
-            onClick={toggleVideo}
-            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
-              isVideoOff 
-                ? 'bg-red-500 hover:bg-red-600' 
-                : 'bg-gray-600 hover:bg-gray-500'
-            }`}
-          >
-            <i className={`fas ${isVideoOff ? 'fa-video-slash' : 'fa-video'} text-xl mb-1`}></i>
-            <span className="text-xs mt-1">{isVideoOff ? 'Start Video' : 'Stop Video'}</span>
-          </button>
-
-          {/* Hide/Show Video Toggle */}
-          <button
-            onClick={toggleVideoHide}
-            className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
-              isVideoHidden 
-                ? 'bg-purple-500 hover:bg-purple-600' 
-                : 'bg-gray-600 hover:bg-gray-500'
-            }`}
-          >
-            <i className={`fas ${isVideoHidden ? 'fa-eye' : 'fa-eye-slash'} text-xl mb-1`}></i>
-            <span className="text-xs mt-1">{isVideoHidden ? 'Show' : 'Hide'}</span>
-          </button>
-
-          {/* Transcription Toggle (Candidate only) */}
-          {userRole === 'candidate' && (
+      {/* Modern Floating Controls */}
+      <div className={`bg-gray-900/95 backdrop-blur-xl border-t border-gray-700/50 transition-all duration-300 ${
+        showControls ? 'translate-y-0' : 'translate-y-full'
+      }`}>
+        <div className="px-4 py-3">
+          <div className="flex justify-center items-center space-x-2 md:space-x-4">
+            {/* Audio Toggle */}
             <button
-              onClick={toggleTranscription}
-              className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 ${
-                transcriptionEnabled 
-                  ? 'bg-green-500 hover:bg-green-600' 
-                  : 'bg-gray-600 hover:bg-gray-500'
+              onClick={toggleAudio}
+              className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                isAudioMuted 
+                  ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25' 
+                  : 'bg-gray-700 hover:bg-gray-600 shadow-lg shadow-gray-500/10'
               }`}
             >
-              <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} text-xl mb-1`}></i>
-              <span className="text-xs mt-1">{transcriptionEnabled ? 'Stop' : 'Transcribe'}</span>
+              <i className={`fas ${isAudioMuted ? 'fa-microphone-slash' : 'fa-microphone'} text-lg mb-1`}></i>
+              <span className="text-xs mt-1 font-medium">{isAudioMuted ? 'Unmute' : 'Mute'}</span>
             </button>
-          )}
 
-          {/* End Call - Larger and Centered */}
-          <button
-            onClick={endCall}
-            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-red-500 hover:bg-red-600 transition-all duration-300 transform hover:scale-105"
-          >
-            <i className="fas fa-phone-slash text-xl mb-1"></i>
-            <span className="text-xs mt-1">End Call</span>
-          </button>
-
-          {/* Transcript Toggle (Interviewer only) */}
-          {userRole === 'interviewer' && (
+            {/* Video Toggle */}
             <button
-              onClick={() => setShowTranscript(!showTranscript)}
-              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-600 hover:bg-gray-500 transition-all duration-300 transform hover:scale-105"
+              onClick={toggleVideo}
+              className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                isVideoOff 
+                  ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25' 
+                  : 'bg-gray-700 hover:bg-gray-600 shadow-lg shadow-gray-500/10'
+              }`}
             >
-              <i className="fas fa-comment-alt text-xl mb-1"></i>
-              <span className="text-xs mt-1">Transcript</span>
+              <i className={`fas ${isVideoOff ? 'fa-video-slash' : 'fa-video'} text-lg mb-1`}></i>
+              <span className="text-xs mt-1 font-medium">{isVideoOff ? 'Video On' : 'Video Off'}</span>
             </button>
-          )}
+
+            {/* Hide/Show Video Toggle */}
+            <button
+              onClick={toggleVideoHide}
+              className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                isVideoHidden 
+                  ? 'bg-purple-500 hover:bg-purple-600 shadow-lg shadow-purple-500/25' 
+                  : 'bg-gray-700 hover:bg-gray-600 shadow-lg shadow-gray-500/10'
+              }`}
+            >
+              <i className={`fas ${isVideoHidden ? 'fa-eye' : 'fa-eye-slash'} text-lg mb-1`}></i>
+              <span className="text-xs mt-1 font-medium">{isVideoHidden ? 'Show' : 'Hide'}</span>
+            </button>
+
+            {/* Transcription Toggle (Candidate only) */}
+            {userRole === 'candidate' && (
+              <button
+                onClick={toggleTranscription}
+                className={`flex flex-col items-center justify-center p-3 rounded-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                  transcriptionEnabled 
+                    ? 'bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/25' 
+                    : 'bg-gray-700 hover:bg-gray-600 shadow-lg shadow-gray-500/10'
+                }`}
+              >
+                <i className={`fas ${transcriptionEnabled ? 'fa-stop' : 'fa-microphone'} text-lg mb-1`}></i>
+                <span className="text-xs mt-1 font-medium">{transcriptionEnabled ? 'Stop' : 'Transcribe'}</span>
+              </button>
+            )}
+
+            {/* End Call - Larger and Centered */}
+            <button
+              onClick={endCall}
+              className="flex flex-col items-center justify-center p-4 rounded-2xl bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25 transition-all duration-300 transform hover:scale-105 active:scale-95"
+            >
+              <i className="fas fa-phone-slash text-xl mb-1"></i>
+              <span className="text-xs mt-1 font-medium">End Call</span>
+            </button>
+
+            {/* Transcript Toggle (Interviewer only) */}
+            {userRole === 'interviewer' && (
+              <button
+                onClick={() => setShowTranscript(!showTranscript)}
+                className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gray-700 hover:bg-gray-600 shadow-lg shadow-gray-500/10 transition-all duration-300 transform hover:scale-105 active:scale-95"
+              >
+                <i className="fas fa-comment-alt text-lg mb-1"></i>
+                <span className="text-xs mt-1 font-medium">Transcript</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Mobile Optimization Notice */}
-      <div className="lg:hidden bg-blue-900 bg-opacity-20 px-4 py-2 text-center">
-        <p className="text-blue-300 text-sm">
-          {isVideoHidden 
-            ? "Your video is partially hidden. Click the eye button to show it fully." 
-            : "Tip: Drag your video to move it or hide it to the side"}
-        </p>
-      </div>
+      {/* Mobile Tap Indicator */}
+      {isMobile && !showControls && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm animate-bounce">
+          <i className="fas fa-hand-pointer mr-2"></i>
+          Tap to show controls
+        </div>
+      )}
     </div>
   );
 }
