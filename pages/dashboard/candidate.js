@@ -9,6 +9,8 @@ const CandidateDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [interviews, setInterviews] = useState([]);
   const [fullName, setFullName] = useState('Candidate');
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [meetingRoomId, setMeetingRoomId] = useState('');
 
   const sidebarItems = [
     { id: 1, name: 'Home', icon: 'fas fa-tachometer-alt', path: '/dashboard/candidate' },
@@ -60,6 +62,14 @@ const CandidateDashboard = () => {
   const handleLogout = () => {
     localStorage.clear();
     router.push('/');
+  };
+
+  const joinMeeting = () => {
+    if (!meetingRoomId.trim()) {
+      alert('Please enter a meeting room ID');
+      return;
+    }
+    router.push(`/meeting/${meetingRoomId.trim()}`);
   };
 
   return (
@@ -155,6 +165,70 @@ const CandidateDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Floating Meeting Room Button */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => setShowMeetingModal(true)}
+          className="relative bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 group"
+        >
+          <i className="fas fa-video text-xl"></i>
+          
+          {/* Animated Ping Effect */}
+          <div className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75 group-hover:opacity-100"></div>
+          
+          {/* Tooltip */}
+          <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-black text-white text-sm rounded py-1 px-2 whitespace-nowrap">
+            Join Meeting Room
+          </div>
+        </button>
+      </div>
+
+      {/* Meeting Room Modal */}
+      {showMeetingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-black">Join Meeting Room</h3>
+              <button
+                onClick={() => setShowMeetingModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <i className="fas fa-times text-xl"></i>
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Meeting Room ID
+              </label>
+              <input
+                type="text"
+                value={meetingRoomId}
+                onChange={(e) => setMeetingRoomId(e.target.value)}
+                placeholder="Enter room ID (e.g., 1yixqfpsh6a)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={joinMeeting}
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg font-semibold transition-colors"
+              >
+                <i className="fas fa-sign-in-alt mr-2"></i>
+                Join Meeting
+              </button>
+              <button
+                onClick={() => setShowMeetingModal(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
