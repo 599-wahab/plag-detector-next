@@ -541,94 +541,117 @@ function InterviewerDashboard() {
       </div>
 
       {/* Candidates Modal (Desktop) */}
-      {showCandidatesModal && !isMobile && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center p-4 overflow-auto">
-          <div className="bg-white rounded-2xl w-full max-w-4xl p-6 my-8">
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
-                  <i className="fas fa-users text-purple-500 text-lg"></i>
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900">Schedule Interviews</h3>
-                  <p className="text-gray-500 text-sm">Select candidates and schedule interviews</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowCandidatesModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <i className="fas fa-times text-xl"></i>
-              </button>
-            </div>
+{showCandidatesModal && !isMobile && (
+  <div className="fixed inset-0 z-50 flex items-start justify-center p-4">
+    {/* Backdrop - clicking it closes modal */}
+    <div
+      className="absolute inset-0 bg-black bg-opacity-50"
+      onClick={() => setShowCandidatesModal(false)}
+      aria-hidden="true"
+    />
 
-            {candidates.length === 0 ? (
-              <div className="text-center py-8">
-                <i className="fas fa-user-slash text-4xl text-gray-300 mb-4"></i>
-                <p className="text-gray-500">No candidates found.</p>
-              </div>
-            ) : (
-              <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                {candidates.map((candidate, idx) => (
-                  <div key={candidate.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-900">{candidate.full_name || candidate.email}</div>
-                      <div className="text-sm text-gray-600">
-                        {candidate.email} {candidate.phone && `• ${candidate.phone}`}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="datetime-local"
-                        value={scheduleDates[idx] || ""}
-                        onChange={(e) => setScheduleDates(prev => ({ ...prev, [idx]: e.target.value }))}
-                        className="border border-gray-300 p-2 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <div className="flex items-center gap-2">
-                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                          <input
-                            type="checkbox"
-                            checked={!!(meetingRoomInputs[idx]?.createRoom)}
-                            onChange={(e) => setMeetingRoomInputs(prev => ({ ...prev, [idx]: { ...(prev[idx]||{}), createRoom: e.target.checked } }))}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          Create Room
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Or enter room id"
-                          value={(meetingRoomInputs[idx]?.meetingRoomId) || ""}
-                          onChange={(e) => setMeetingRoomInputs(prev => ({ ...prev, [idx]: { ...(prev[idx]||{}), meetingRoomId: e.target.value } }))}
-                          className="border border-gray-300 p-2 rounded-lg w-32 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-
-                      <button
-                        onClick={() => saveInterview(candidate, idx)}
-                        disabled={savingIdx === idx || !scheduleDates[idx]}
-                        className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors min-w-32 justify-center"
-                      >
-                        {savingIdx === idx ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            <span>Saving...</span>
-                          </>
-                        ) : (
-                          <>
-                            <i className="fas fa-calendar-plus"></i>
-                            <span>Schedule</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+    {/* Modal container */}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="candidates-title"
+      className="relative bg-white rounded-2xl w-full max-w-4xl p-6 my-8 shadow-xl overflow-hidden"
+      onClick={(e) => e.stopPropagation()} // prevents backdrop click when clicking inside
+    >
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+            <i className="fas fa-users text-purple-500 text-lg"></i>
+          </div>
+          <div>
+            <h3 id="candidates-title" className="text-xl font-semibold text-gray-900">Schedule Interviews</h3>
+            <p className="text-gray-500 text-sm">Select candidates and schedule interviews</p>
           </div>
         </div>
-      )}
+
+        {/* Close button */}
+        <button
+          onClick={() => setShowCandidatesModal(false)}
+          className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          aria-label="Close candidates modal"
+        >
+          <i className="fas fa-times text-xl"></i>
+        </button>
+      </div>
+
+      {/* Body: scrollable list */}
+      <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+        {candidates.length === 0 ? (
+          <div className="text-center py-8">
+            <i className="fas fa-user-slash text-4xl text-gray-300 mb-4"></i>
+            <p className="text-gray-500">No candidates found.</p>
+          </div>
+        ) : (
+          candidates.map((candidate, idx) => (
+            <div key={candidate.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-gray-900 truncate">{candidate.full_name || candidate.email}</div>
+                <div className="text-sm text-gray-600 truncate">
+                  {candidate.email}
+                  {candidate.phone ? ` • ${candidate.phone}` : ''}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 ml-4">
+                <input
+                  type="datetime-local"
+                  value={scheduleDates[idx] || ""}
+                  onChange={(e) => setScheduleDates(prev => ({ ...prev, [idx]: e.target.value }))}
+                  className="border border-gray-300 p-2 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={!!(meetingRoomInputs[idx]?.createRoom)}
+                      onChange={(e) => setMeetingRoomInputs(prev => ({ ...prev, [idx]: { ...(prev[idx]||{}), createRoom: e.target.checked } }))}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Create Room</span>
+                  </label>
+
+                  <input
+                    type="text"
+                    placeholder="Or enter room id"
+                    value={(meetingRoomInputs[idx]?.meetingRoomId) || ""}
+                    onChange={(e) => setMeetingRoomInputs(prev => ({ ...prev, [idx]: { ...(prev[idx]||{}), meetingRoomId: e.target.value } }))}
+                    className="border border-gray-300 p-2 rounded-lg w-32 text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <button
+                  onClick={() => saveInterview(candidate, idx)}
+                  disabled={savingIdx === idx || !scheduleDates[idx]}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  {savingIdx === idx ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-calendar-plus"></i>
+                      <span>Schedule</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

@@ -76,8 +76,16 @@ export default function Navbar() {
 
   const navItems = [
     { path: "/", label: "Home", icon: <FaHome className="text-sm" /> },
-    { path: "/about-us", label: "About", icon: <FaInfoCircle className="text-sm" /> },
-    { path: "/contact", label: "Contact", icon: <FaEnvelope className="text-sm" /> },
+    {
+      path: "/about-us",
+      label: "About",
+      icon: <FaInfoCircle className="text-sm" />,
+    },
+    {
+      path: "/contact",
+      label: "Contact",
+      icon: <FaEnvelope className="text-sm" />,
+    },
   ];
 
   const getUserDisplayName = () => {
@@ -118,7 +126,13 @@ export default function Navbar() {
                       : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
                   }`}
                 >
-                  <span className={`${isActive(path) ? "text-blue-500" : "text-gray-400"}`}>{icon}</span>
+                  <span
+                    className={`${
+                      isActive(path) ? "text-blue-500" : "text-gray-400"
+                    }`}
+                  >
+                    {icon}
+                  </span>
                   <span>{label}</span>
                 </Link>
               ))}
@@ -143,22 +157,40 @@ export default function Navbar() {
                       <FaUser className="text-white text-xs" />
                     </div>
                     <div className="text-left">
-                      <p className="text-sm font-medium text-gray-900 capitalize">{user.role || "user"}</p>
-                      <p className="text-xs text-gray-500 truncate max-w-[120px]">{getUserDisplayName()}</p>
+                      <p className="text-sm font-medium text-gray-900 capitalize">
+                        {user.role || "user"}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate max-w-[120px]">
+                        {getUserDisplayName()}
+                      </p>
                     </div>
-                    <FaChevronDown className={`text-gray-400 text-sm transition-transform ${isUserMenuOpen ? "rotate-180" : ""}`} />
+                    <FaChevronDown
+                      className={`text-gray-400 text-sm transition-transform ${
+                        isUserMenuOpen ? "rotate-180" : ""
+                      }`}
+                    />
                   </button>
 
                   {/* User Dropdown (desktop) */}
                   {isUserMenuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-[60]">
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-sm font-medium text-gray-900 capitalize">{user.role || "user"}</p>
-                        <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                        <p className="text-sm font-medium text-gray-900 capitalize">
+                          {user.role || "user"}
+                        </p>
+                        <p className="text-sm text-gray-500 truncate">
+                          {user.email}
+                        </p>
                       </div>
 
                       <Link
-                        href={user.role === "interviewer" ? "/dashboard/interviewer" : user.role === "candidate" ? "/dashboard/candidate" : "/dashboard"}
+                        href={
+                          user.role === "interviewer"
+                            ? "/dashboard/interviewer"
+                            : user.role === "candidate"
+                            ? "/dashboard/candidate"
+                            : "/dashboard"
+                        }
                         className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                         onClick={() => setIsUserMenuOpen(false)}
                       >
@@ -178,10 +210,16 @@ export default function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-3">
-                  <button onClick={handleLogin} className="px-6 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">
+                  <button
+                    onClick={handleLogin}
+                    className="px-6 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
                     Sign In
                   </button>
-                  <button onClick={handleSignup} className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium rounded-xl hover:shadow-lg">
+                  <button
+                    onClick={handleSignup}
+                    className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium rounded-xl hover:shadow-lg"
+                  >
                     Get Started
                   </button>
                 </div>
@@ -202,8 +240,17 @@ export default function Navbar() {
                 </button>
               )}
 
-              <button onClick={() => setIsMenuOpen((s) => !s)} className="p-2 rounded-lg text-gray-700 hover:bg-gray-100" aria-expanded={isMenuOpen} aria-label="Toggle menu">
-                {isMenuOpen ? <FaTimes className="text-lg" /> : <FaBars className="text-lg" />}
+              <button
+                onClick={() => setIsMenuOpen((s) => !s)}
+                className="p-2 rounded-lg text-gray-700 hover:bg-gray-100"
+                aria-expanded={isMenuOpen}
+                aria-label="Toggle menu"
+              >
+                {isMenuOpen ? (
+                  <FaTimes className="text-lg" />
+                ) : (
+                  <FaBars className="text-lg" />
+                )}
               </button>
             </div>
           </div>
@@ -217,10 +264,20 @@ export default function Navbar() {
                   <Link
                     key={path}
                     href={path}
-                    className={`flex items-center space-x-3 px-3 py-3 rounded-xl text-sm font-medium ${isActive(path) ? "text-blue-600 bg-blue-50" : "text-gray-700 hover:bg-gray-50"}`}
+                    className={`flex items-center space-x-3 px-3 py-3 rounded-xl text-sm font-medium ${
+                      isActive(path)
+                        ? "text-blue-600 bg-blue-50"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`}
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <span className={isActive(path) ? "text-blue-500" : "text-gray-400"}>{icon}</span>
+                    <span
+                      className={
+                        isActive(path) ? "text-blue-500" : "text-gray-400"
+                      }
+                    >
+                      {icon}
+                    </span>
                     <span>{label}</span>
                   </Link>
                 ))}
@@ -236,12 +293,20 @@ export default function Navbar() {
                 ) : user ? (
                   <div className="space-y-2">
                     <div className="px-3 py-2">
-                      <p className="text-sm font-medium text-gray-900 capitalize">{user.role || "user"}</p>
+                      <p className="text-sm font-medium text-gray-900 capitalize">
+                        {user.role || "user"}
+                      </p>
                       <p className="text-xs text-gray-500">{user.email}</p>
                     </div>
 
                     <Link
-                      href={user.role === "interviewer" ? "/dashboard/interviewer" : user.role === "candidate" ? "/dashboard/candidate" : "/dashboard"}
+                      href={
+                        user.role === "interviewer"
+                          ? "/dashboard/interviewer"
+                          : user.role === "candidate"
+                          ? "/dashboard/candidate"
+                          : "/dashboard"
+                      }
                       className="flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-sm text-gray-700 hover:bg-gray-50"
                       onClick={() => setIsMenuOpen(false)}
                     >
@@ -249,18 +314,27 @@ export default function Navbar() {
                       <span>Dashboard</span>
                     </Link>
 
-                    <button onClick={handleLogout} className="flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-sm text-red-600 hover:bg-red-50">
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center space-x-3 w-full px-3 py-3 rounded-xl text-sm text-red-600 hover:bg-red-50"
+                    >
                       <FaSignInAlt className="text-red-400 text-sm w-5" />
                       <span>Sign Out</span>
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <button onClick={handleLogin} className="w-full flex items-center justify-center space-x-2 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-xl">
+                    <button
+                      onClick={handleLogin}
+                      className="w-full flex items-center justify-center space-x-2 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-xl"
+                    >
                       <FaSignInAlt className="text-gray-400" />
                       <span>Sign In</span>
                     </button>
-                    <button onClick={handleSignup} className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium rounded-xl py-3">
+                    <button
+                      onClick={handleSignup}
+                      className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white text-sm font-medium rounded-xl py-3"
+                    >
                       Get Started Free
                     </button>
                   </div>
@@ -270,24 +344,41 @@ export default function Navbar() {
           )}
 
           {/* Backdrop for mobile menu */}
-          {isMenuOpen && <div className="lg:hidden fixed inset-0 bg-black/20 z-40" onClick={() => setIsMenuOpen(false)} />}
+          {isMenuOpen && (
+            <div
+              className="lg:hidden fixed inset-0 bg-black/20 z-40"
+              onClick={() => setIsMenuOpen(false)}
+            />
+          )}
 
           {/* Backdrop for user dropdown */}
-          {isUserMenuOpen && <div className="fixed inset-0 z-30" onClick={() => setIsUserMenuOpen(false)} />}
+          {isUserMenuOpen && (
+            <div
+              className="fixed inset-0 z-30"
+              onClick={() => setIsUserMenuOpen(false)}
+            />
+          )}
         </div>
-
         {/* Desktop/User dropdown for mobile toggle needs own container so it's not clipped */}
         {/* Rendered outside nav inner container to ensure z-index correctness */}
         {isUserMenuOpen && user && (
-          <div className="fixed top-20 right-4 z-50">
+          <div className="fixed top-20 right-4 z-50 lg:hidden">
             <div className="w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2">
               <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-medium text-gray-900 capitalize">{user.role || "user"}</p>
+                <p className="text-sm font-medium text-gray-900 capitalize">
+                  {user.role || "user"}
+                </p>
                 <p className="text-sm text-gray-500 truncate">{user.email}</p>
               </div>
 
               <Link
-                href={user.role === "interviewer" ? "/dashboard/interviewer" : user.role === "candidate" ? "/dashboard/candidate" : "/dashboard"}
+                href={
+                  user.role === "interviewer"
+                    ? "/dashboard/interviewer"
+                    : user.role === "candidate"
+                    ? "/dashboard/candidate"
+                    : "/dashboard"
+                }
                 className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 onClick={() => setIsUserMenuOpen(false)}
               >
@@ -296,7 +387,10 @@ export default function Navbar() {
               </Link>
 
               <button
-                onClick={() => { setIsUserMenuOpen(false); handleLogout(); }}
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  handleLogout();
+                }}
                 className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
               >
                 <FaSignInAlt className="text-red-400 text-sm" />
