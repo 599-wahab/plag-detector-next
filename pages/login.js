@@ -40,6 +40,7 @@ export default function Login() {
       if (resp.ok) {
         localStorage.setItem('userId', data.userId || '');
         localStorage.setItem('role', data.role || '');
+        localStorage.setItem('email', data.email || '');
         const redirectPath =
           data.role === 'interviewer'
             ? '/dashboard/interviewer'
@@ -67,56 +68,72 @@ export default function Login() {
         <div className="blob blob3"></div>
       </div>
 
-      <div className="min-h-screen flex items-center justify-center bg-transparent pt-16 px-4">
-        <div className="max-w-md w-full relative">
-          <div className="relative backdrop-blur-md bg-white/70 rounded-2xl shadow-2xl border border-gray-200 p-8 z-10">
+      <div className="min-h-screen flex items-center justify-center bg-transparent pt-16 px-4 relative z-10">
+        <div className="max-w-md w-full">
+          <div className="relative backdrop-blur-md bg-white/10 rounded-2xl shadow-2xl border border-white/20 p-6 sm:p-8">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <i className="fas fa-shield-alt text-white text-2xl"></i>
               </div>
-              <h2 className="text-3xl font-bold text-black mb-2">Welcome Back</h2>
-              <p className="text-gray-600">Enter your details to continue</p>
+              <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
+              <p className="text-gray-200">Enter your details to continue</p>
             </div>
 
             <form onSubmit={doLogin} className="space-y-6">
               <div>
-                <input type="email" name="email" value={formData.email} onChange={handleChange}
+                <input 
+                  type="email" 
+                  name="email" 
+                  value={formData.email} 
+                  onChange={handleChange}
                   placeholder="Email Address"
-                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 shadow-sm ${
+                  className={`w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm ${
                     errors.email ? 'border-red-400' : ''
-                  }`} />
-                {errors.email && <p className="mt-2 text-sm text-red-500">{errors.email}</p>}
+                  }`}
+                />
+                {errors.email && <p className="mt-2 text-sm text-red-300">{errors.email}</p>}
               </div>
 
               <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password}
-                  onChange={handleChange} placeholder="Password"
-                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 shadow-sm ${
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  name="password" 
+                  value={formData.password}
+                  onChange={handleChange} 
+                  placeholder="Password"
+                  className={`w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm pr-12 ${
                     errors.password ? 'border-red-400' : ''
-                  }`} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-black">
+                  }`}
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
+                >
                   <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                 </button>
-                {errors.password && <p className="mt-2 text-sm text-red-500">{errors.password}</p>}
+                {errors.password && <p className="mt-2 text-sm text-red-300">{errors.password}</p>}
               </div>
 
               {errors.general && (
-                <div className="bg-red-100 border border-red-300 rounded-lg p-3">
-                  <p className="text-red-500 text-sm">{errors.general}</p>
+                <div className="bg-red-400/20 border border-red-400/50 rounded-lg p-3 backdrop-blur-sm">
+                  <p className="text-red-300 text-sm">{errors.general}</p>
                 </div>
               )}
 
-              <button type="submit" disabled={isLoading}
-                className="w-full rainbow-btn py-3 px-6 rounded-lg font-semibold text-black transition-all duration-300">
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full rainbow-btn py-3 px-6 rounded-lg font-semibold text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {isLoading ? 'Signing In...' : 'Enter Advanced Interview Era'}
               </button>
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-gray-600">
+              <p className="text-gray-200">
                 New Here?{' '}
-                <a href="/signup" className="text-black font-semibold hover:underline">
+                <a href="/signup" className="text-white font-semibold hover:underline transition-colors">
                   Signup First
                 </a>
               </p>

@@ -69,70 +69,101 @@ export default function Signup() {
         <div className="blob blob3"></div>
       </div>
 
-      <div className="min-h-screen flex items-center justify-center bg-transparent pt-16 px-4">
-        <div className="max-w-md w-full relative">
-          <div className="relative backdrop-blur-md bg-white/70 rounded-2xl shadow-2xl border border-gray-200 p-8 z-10">
+      <div className="min-h-screen flex items-center justify-center bg-transparent pt-16 px-4 relative z-10">
+        <div className="max-w-md w-full">
+          <div className="relative backdrop-blur-md bg-white/10 rounded-2xl shadow-2xl border border-white/20 p-6 sm:p-8">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <i className="fas fa-user-plus text-white text-2xl"></i>
               </div>
-              <h2 className="text-3xl font-bold text-black mb-2">Create Account</h2>
-              <p className="text-gray-600">Enter your details to get started</p>
+              <h2 className="text-3xl font-bold text-white mb-2">Create Account</h2>
+              <p className="text-gray-200">Enter your details to get started</p>
             </div>
 
             <form onSubmit={doSignup} className="space-y-6">
-              <input type="email" name="email" placeholder="Email Address" value={formData.email}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:ring-2 focus:ring-blue-500 shadow-sm" />
-              {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
+              <div>
+                <input 
+                  type="email" 
+                  name="email" 
+                  placeholder="Email Address" 
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm"
+                />
+                {errors.email && <p className="mt-2 text-sm text-red-300">{errors.email}</p>}
+              </div>
 
               <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} name="password" placeholder="Password"
-                  value={formData.password} onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 shadow-sm" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-black">
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  name="password" 
+                  placeholder="Password"
+                  value={formData.password} 
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm pr-12"
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
+                >
                   <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                 </button>
+                {errors.password && <p className="mt-2 text-sm text-red-300">{errors.password}</p>}
               </div>
-              {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
 
               <div className="relative">
-                <input type={showConfirmPassword ? 'text' : 'password'} name="confirmPassword"
-                  placeholder="Confirm Password" value={formData.confirmPassword}
+                <input 
+                  type={showConfirmPassword ? 'text' : 'password'} 
+                  name="confirmPassword"
+                  placeholder="Confirm Password" 
+                  value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 shadow-sm" />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-black">
+                  className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-300 focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm pr-12"
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white transition-colors"
+                >
                   <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                 </button>
+                {errors.confirmPassword && <p className="mt-2 text-sm text-red-300">{errors.confirmPassword}</p>}
               </div>
-              {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
 
-              <select name="role" value={formData.role} onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 shadow-sm">
-                <option value="" disabled>Select your role</option>
-                <option value="candidate">Candidate (Interviewee)</option>
-                <option value="interviewer">Interviewer</option>
-              </select>
-              {errors.role && <p className="text-sm text-red-500">{errors.role}</p>}
+              <div>
+                <select 
+                  name="role" 
+                  value={formData.role} 
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white focus:ring-2 focus:ring-blue-400 focus:border-transparent backdrop-blur-sm"
+                >
+                  <option value="" disabled className="text-gray-800">Select your role</option>
+                  <option value="candidate" className="text-gray-800">Candidate (Interviewee)</option>
+                  <option value="interviewer" className="text-gray-800">Interviewer</option>
+                </select>
+                {errors.role && <p className="mt-2 text-sm text-red-300">{errors.role}</p>}
+              </div>
 
               {errors.general && (
-                <div className="bg-red-100 border border-red-300 rounded-lg p-3">
-                  <p className="text-red-500 text-sm">{errors.general}</p>
+                <div className="bg-red-400/20 border border-red-400/50 rounded-lg p-3 backdrop-blur-sm">
+                  <p className="text-red-300 text-sm">{errors.general}</p>
                 </div>
               )}
 
-              <button type="submit" disabled={isLoading}
-                className="w-full rainbow-btn py-3 px-6 rounded-lg font-semibold text-black transition-all duration-300">
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full rainbow-btn py-3 px-6 rounded-lg font-semibold text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {isLoading ? 'Creating Account...' : 'Create Account'}
               </button>
             </form>
 
             <div className="mt-6 text-center">
-              <p className="text-gray-600">
+              <p className="text-gray-200">
                 Already have an account?{' '}
-                <a href="/login" className="text-black font-semibold hover:underline">Login Here</a>
+                <a href="/login" className="text-white font-semibold hover:underline transition-colors">Login Here</a>
               </p>
             </div>
           </div>

@@ -1,73 +1,67 @@
 /* styles/AnimatedBackground.css */
 .animated-bg {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   overflow: hidden;
   z-index: -1;
-  background: radial-gradient(circle at 20% 30%, #ffffff, #f4f4f8);
 }
 
 .blob {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.45;
-  filter: blur(60px);
-  animation: float 18s ease-in-out infinite;
+  filter: blur(40px);
+  opacity: 0.3;
+  animation: float 20s infinite linear;
 }
 
 .blob1 {
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(circle at 30% 30%, #6a11cb, #2575fc);
-  top: -80px;
-  left: -120px;
+  width: 400px;
+  height: 400px;
+  background: linear-gradient(45deg, #ff6b6b, #feca57);
+  top: 10%;
+  left: 5%;
   animation-delay: 0s;
 }
 
 .blob2 {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle at 70% 70%, #ff7eb3, #ff758c);
-  bottom: -100px;
-  right: -100px;
-  animation-delay: 3s;
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(45deg, #48dbfb, #0abde3);
+  top: 60%;
+  right: 10%;
+  animation-delay: -7s;
 }
 
 .blob3 {
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle at 40% 40%, #43cea2, #185a9d);
-  top: 50%;
-  left: 60%;
-  transform: translate(-50%, -50%);
-  animation-delay: 6s;
+  width: 350px;
+  height: 350px;
+  background: linear-gradient(45deg, #ff9ff3, #f368e0);
+  bottom: 10%;
+  left: 20%;
+  animation-delay: -14s;
 }
 
 @keyframes float {
   0%, 100% {
-    transform: translate(0, 0) scale(1);
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(50px, 50px) rotate(90deg);
   }
   50% {
-    transform: translate(30px, -40px) scale(1.1);
+    transform: translate(0, 100px) rotate(180deg);
+  }
+  75% {
+    transform: translate(-50px, 50px) rotate(270deg);
   }
 }
 
-/* Animated gradient border for buttons */
+/* Rainbow button styles */
 .rainbow-btn {
-  position: relative;
-  border: none;
-  color: white;
-  font-weight: 600;
-  background: #000;
-  overflow: hidden;
-  z-index: 0;
-  transition: color 0.3s ease;
-}
-
-.rainbow-btn::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
   background: linear-gradient(
     270deg,
     #ff0000,
@@ -81,30 +75,62 @@
     #ff0000
   );
   background-size: 400% 400%;
-  animation: rainbowMove 6s linear infinite;
-  z-index: -1;
-  border-radius: inherit;
-}
-
-.rainbow-btn::after {
-  content: "";
-  position: absolute;
-  inset: 2px;
-  background: white;
-  border-radius: inherit;
-  z-index: -1;
+  animation: rainbow 3s linear infinite;
+  border: none;
+  color: white;
+  font-weight: bold;
 }
 
 .rainbow-btn:hover {
-  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 }
 
-.rainbow-btn:hover::after {
-  background: black;
-}
-
-@keyframes rainbowMove {
+@keyframes rainbow {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .blob {
+    filter: blur(30px);
+  }
+  
+  .blob1 {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .blob2 {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .blob3 {
+    width: 180px;
+    height: 180px;
+  }
+}
+
+@media (max-width: 480px) {
+  .blob {
+    filter: blur(20px);
+  }
+  
+  .blob1 {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .blob2 {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .blob3 {
+    width: 140px;
+    height: 140px;
+  }
 }
