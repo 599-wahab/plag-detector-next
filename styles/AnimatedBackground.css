@@ -5,32 +5,31 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   overflow: hidden;
-  z-index: -1;
+  z-index: 0;
 }
 
 .blob {
   position: absolute;
   border-radius: 50%;
   filter: blur(40px);
-  opacity: 0.3;
-  animation: float 20s infinite linear;
+  opacity: 0.1;
+  animation: blob-float 20s infinite linear;
 }
 
 .blob1 {
   width: 400px;
   height: 400px;
   background: linear-gradient(45deg, #ff6b6b, #feca57);
-  top: 10%;
-  left: 5%;
+  top: 20%;
+  left: 10%;
   animation-delay: 0s;
 }
 
 .blob2 {
   width: 300px;
   height: 300px;
-  background: linear-gradient(45deg, #48dbfb, #0abde3);
+  background: linear-gradient(45deg, #48dbfb, #ff9ff3);
   top: 60%;
   right: 10%;
   animation-delay: -7s;
@@ -39,57 +38,25 @@
 .blob3 {
   width: 350px;
   height: 350px;
-  background: linear-gradient(45deg, #ff9ff3, #f368e0);
-  bottom: 10%;
-  left: 20%;
+  background: linear-gradient(45deg, #1dd1a1, #54a0ff);
+  bottom: 20%;
+  left: 60%;
   animation-delay: -14s;
 }
 
-@keyframes float {
+@keyframes blob-float {
   0%, 100% {
-    transform: translate(0, 0) rotate(0deg);
+    transform: translate(0, 0) scale(1);
   }
   25% {
-    transform: translate(50px, 50px) rotate(90deg);
+    transform: translate(50px, -50px) scale(1.1);
   }
   50% {
-    transform: translate(0, 100px) rotate(180deg);
+    transform: translate(0, -100px) scale(1);
   }
   75% {
-    transform: translate(-50px, 50px) rotate(270deg);
+    transform: translate(-50px, -50px) scale(0.9);
   }
-}
-
-/* Rainbow button styles */
-.rainbow-btn {
-  background: linear-gradient(
-    270deg,
-    #ff0000,
-    #ff7300,
-    #fffb00,
-    #48ff00,
-    #00ffd5,
-    #002bff,
-    #7a00ff,
-    #ff00ab,
-    #ff0000
-  );
-  background-size: 400% 400%;
-  animation: rainbow 3s linear infinite;
-  border: none;
-  color: white;
-  font-weight: bold;
-}
-
-.rainbow-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-}
-
-@keyframes rainbow {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
 }
 
 /* Responsive adjustments */
@@ -111,26 +78,5 @@
   .blob3 {
     width: 180px;
     height: 180px;
-  }
-}
-
-@media (max-width: 480px) {
-  .blob {
-    filter: blur(20px);
-  }
-  
-  .blob1 {
-    width: 150px;
-    height: 150px;
-  }
-  
-  .blob2 {
-    width: 120px;
-    height: 120px;
-  }
-  
-  .blob3 {
-    width: 140px;
-    height: 140px;
   }
 }

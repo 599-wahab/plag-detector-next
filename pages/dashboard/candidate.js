@@ -1,6 +1,6 @@
-// pages/dashboard/candidate.js
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import withAuth from '../../lib/withAuth';
 import Sidebar from '../../components/Sidebar';
 import Navbar from "../../components/Navbar";
@@ -19,6 +19,7 @@ const CandidateDashboard = () => {
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [meetingRoomId, setMeetingRoomId] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+  const [activeTab, setActiveTab] = useState('upcoming');
 
   // userId (safe for SSR)
   const [userId, setUserId] = useState(null);
@@ -28,10 +29,27 @@ const CandidateDashboard = () => {
   const { data, error, mutate } = useSWR(
     userId ? `/api/get-my-interviews-by-id?userId=${userId}` : null,
     fetcher,
-    { revalidateOnFocus: true }
+    { revalidateOnFocus: true, refreshInterval: 30000 }
   );
 
   const interviews = data?.interviews || [];
+
+  // Filter interviews based on active tab
+  const filteredInterviews = interviews.filter(interview => {
+    const now = new Date();
+    const scheduledDate = interview.scheduledAt ? new Date(interview.scheduledAt) : null;
+    
+    switch (activeTab) {
+      case 'upcoming':
+        return scheduledDate && scheduledDate > now;
+      case 'completed':
+        return interview.status === 'completed';
+      case 'cancelled':
+        return interview.status === 'cancelled';
+      default:
+        return true;
+    }
+  });
 
   // run on mount: set userId, sidebar state, profile, resize handlers
   useEffect(() => {
@@ -55,47 +73,6 @@ const CandidateDashboard = () => {
 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  // Optional: realtime notification (if NEXT_PUBLIC_SIGNALING_SERVER set)
-  useEffect(() => {
-    if (!userId) return;
-    const SIGNALING = process.env.NEXT_PUBLIC_SIGNALING_SERVER;
-    if (!SIGNALING) return; // not configured; skip socket
-
-    // import dynamically to avoid SSR issues
-    let socket;
-    (async () => {
-      const { io } = await import('socket.io-client');
-      socket = io(SIGNALING, { transports: ['websocket'] });
-
-      socket.on('connect', () => {
-        // Optionally join a personal room if your server supports it
-        // socket.emit('join-personal', userId);
-        // Listen for scheduled interview notifications
-        socket.on('scheduled-interview', (payload) => {
-          try {
-            // payload expected: { userId, meetingRoomId, scheduledAt }
-            if (!payload) return;
-            if (payload.userId && payload.userId.toString() === userId.toString()) {
-              // notify and revalidate SWR
-              alert(`Interview scheduled. Room ID: ${payload.meetingRoomId || 'TBD'}`);
-              mutate(); // re-fetch interview list
-            }
-          } catch (e) {
-            console.error('socket scheduled-interview handler error', e);
-          }
-        });
-      });
-
-      socket.on('connect_error', (err) => {
-        console.warn('Socket connect error', err);
-      });
-    })();
-
-    return () => {
-      if (socket) socket.disconnect();
-    };
-  }, [userId, mutate]);
 
   // fetch profile for fullname
   const fetchProfile = async (uid) => {
@@ -131,7 +108,7 @@ const CandidateDashboard = () => {
     router.push('/');
   };
 
-  // format helpers (kept from your code)
+  // format helpers
   const formatDate = (dateString) => {
     if (!dateString) return { date: 'N/A', time: '', full: '' };
     const date = new Date(dateString);
@@ -143,13 +120,13 @@ const CandidateDashboard = () => {
   };
 
   const getStatusColor = (status, scheduledAt) => {
-    if (!scheduledAt) return 'bg-yellow-100 text-yellow-800';
+    if (!scheduledAt) return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
     const scheduledDate = new Date(scheduledAt);
     const now = new Date();
-    if (scheduledDate > now) return 'bg-blue-100 text-blue-800';
-    if (status === 'completed') return 'bg-green-100 text-green-800';
-    if (status === 'cancelled') return 'bg-red-100 text-red-800';
-    return 'bg-yellow-100 text-yellow-800';
+    if (scheduledDate > now) return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+    if (status === 'completed') return 'bg-green-500/20 text-green-300 border-green-500/30';
+    if (status === 'cancelled') return 'bg-red-500/20 text-red-300 border-red-500/30';
+    return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
   };
 
   const getStatusText = (status, scheduledAt) => {
@@ -162,339 +139,408 @@ const CandidateDashboard = () => {
     return 'Pending';
   };
 
+  // Stats calculations
+  const stats = {
+    total: interviews.length,
+    upcoming: interviews.filter(i => i.scheduledAt && new Date(i.scheduledAt) > new Date()).length,
+    completed: interviews.filter(i => i.status === 'completed').length,
+    cancelled: interviews.filter(i => i.status === 'cancelled').length,
+  };
+
   // UI for loading / errors (SWR)
   const loadingInterviews = !data && !error;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <Navbar />
+    <>
+      <Head>
+        <title>Candidate Dashboard - Skill Scanner</title>
+        <meta name="description" content="Manage your interviews and track your progress on Skill Scanner" />
+      </Head>
 
-      <div className="flex">
-        {/* Sidebar Component */}
-        <Sidebar
-          sidebarCollapsed={sidebarCollapsed}
-          toggleSidebar={toggleSidebar}
-          handleLogout={handleLogout}
-        />
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-black">
+        {/* Navbar */}
+        <Navbar />
 
-        {/* Main Content */}
-        <div
-          className={`flex-1 transition-all duration-300 ${
-            sidebarCollapsed ? 'ml-20' : 'ml-0 md:ml-72'
-          } p-4 md:p-6`}
-        >
-          {/* Header Section */}
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6 md:mb-8">
-            <div className="flex-1">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">
-                Welcome back, {fullName}!
-              </h1>
-              <p className="text-gray-600 text-sm md:text-base">
-                Manage your interviews and track your progress
-              </p>
+        <div className="flex">
+          {/* Sidebar Component */}
+          <Sidebar
+            sidebarCollapsed={sidebarCollapsed}
+            toggleSidebar={toggleSidebar}
+            handleLogout={handleLogout}
+          />
+
+          {/* Main Content */}
+          <div
+            className={`flex-1 transition-all duration-300 ${
+              sidebarCollapsed ? 'ml-20' : 'ml-0 md:ml-72'
+            } p-4 md:p-6`}
+          >
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6 md:mb-8">
+              <div className="flex-1">
+                <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                  Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-pink-500">{fullName}</span>!
+                </h1>
+                <p className="text-gray-300 text-sm md:text-base">
+                  Manage your interviews and track your progress
+                </p>
+              </div>
+
+              {/* Search Bar */}
+              <div className="flex items-center bg-white/10 backdrop-blur-lg rounded-xl px-4 py-2 min-w-80 border border-white/20 shadow-lg">
+                <input
+                  type="text"
+                  placeholder="Search jobs, interviews..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none text-sm"
+                />
+                <svg className="w-5 h-5 text-gray-400 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
             </div>
 
-            {/* Search Bar - Hidden on mobile to save space */}
-            <div className="hidden md:flex items-center bg-white rounded-full px-4 py-2 min-w-80 border border-gray-200 shadow-sm">
-              <input
-                type="text"
-                placeholder="Search jobs, interviews..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 bg-transparent text-gray-900 placeholder-gray-500 focus:outline-none text-sm"
-              />
-              <i className="fas fa-search text-gray-400 ml-2"></i>
-            </div>
-          </div>
-
-          {/* Recent Interviews Section */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 md:p-6">
-            <div className="flex items-center justify-between mb-4 md:mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                  <i className="fas fa-calendar-alt text-blue-500 text-lg"></i>
-                </div>
-                <div>
-                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">Recent Interviews</h2>
-                  <p className="text-gray-500 text-sm hidden md:block">
-                    Your upcoming and completed interviews
-                  </p>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 md:mb-8">
+              <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4 md:p-6 hover:border-purple-500/30 transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">Total Interviews</p>
+                    <p className="text-2xl font-bold text-white">{stats.total}</p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 md:w-6 md:h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
                 </div>
               </div>
 
-              {/* Mobile Search Button */}
-              <button className="md:hidden p-2 bg-gray-100 rounded-lg hover:bg-gray-200">
-                <i className="fas fa-search text-gray-600"></i>
-              </button>
+              <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4 md:p-6 hover:border-purple-500/30 transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">Upcoming</p>
+                    <p className="text-2xl font-bold text-white">{stats.upcoming}</p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 md:w-6 md:h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4 md:p-6 hover:border-purple-500/30 transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">Completed</p>
+                    <p className="text-2xl font-bold text-white">{stats.completed}</p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 md:w-6 md:h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4 md:p-6 hover:border-purple-500/30 transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-400">Cancelled</p>
+                    <p className="text-2xl font-bold text-white">{stats.cancelled}</p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 md:w-6 md:h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {loadingInterviews ? (
-              <div className="py-12 text-center text-gray-600">Loading interviews...</div>
-            ) : error ? (
-              <div className="py-12 text-center text-red-600">Failed to load interviews.</div>
-            ) : interviews.length > 0 ? (
-              <>
-                {/* Desktop Table View */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="min-w-full text-gray-900">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Date & Time</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Status</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Contact</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Position</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {interviews.map((interview) => {
-                        const formattedDate = formatDate(interview.scheduledAt);
-                        const statusText = getStatusText(interview.status, interview.scheduledAt);
-                        const statusColor = getStatusColor(interview.status, interview.scheduledAt);
-
-                        return (
-                          <tr key={interview.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="text-sm font-medium text-gray-900">{formattedDate.date}</div>
-                              <div className="text-xs text-gray-500">{formattedDate.time}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
-                                {statusText}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900">
-                              {interview.phone || 'N/A'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900">
-                              {interview.position || 'Not specified'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900">
-                              {interview.meetingRoomId ? (
-                                <button
-                                  onClick={() => joinMeeting(interview.meetingRoomId)}
-                                  className="px-3 py-1 bg-blue-600 text-white rounded"
-                                >
-                                  Join
-                                </button>
-                              ) : (
-                                <span className="text-gray-500">No room yet</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            {/* Interviews Section */}
+            <div className="backdrop-blur-xl bg-white/5 rounded-3xl border border-white/10 shadow-2xl p-4 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+                <div className="flex items-center space-x-3 mb-4 md:mb-0">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 md:w-6 md:h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold text-white">My Interviews</h2>
+                    <p className="text-gray-400 text-sm hidden md:block">
+                      Your upcoming and completed interviews
+                    </p>
+                  </div>
                 </div>
 
-                {/* Mobile Card View */}
-                <div className="md:hidden space-y-3">
-                  {interviews.map((interview) => {
-                    const formattedDate = formatDate(interview.scheduledAt);
-                    const statusText = getStatusText(interview.status, interview.scheduledAt);
-                    const statusColor = getStatusColor(interview.status, interview.scheduledAt);
+                {/* Tabs */}
+                <div className="flex space-x-1 bg-white/10 rounded-xl p-1">
+                  {['upcoming', 'completed', 'cancelled', 'all'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium capitalize transition-all duration-300 ${
+                        activeTab === tab
+                          ? 'bg-purple-500 text-white shadow-lg'
+                          : 'text-gray-300 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                    return (
-                      <div key={interview.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-gray-900 text-sm mb-1">
-                              {interview.position || 'Interview'}
-                            </h3>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
-                              <i className="fas fa-calendar text-gray-400"></i>
-                              <span>{formattedDate.date}</span>
-                              <i className="fas fa-clock text-gray-400 ml-2"></i>
-                              <span>{formattedDate.time}</span>
+              {loadingInterviews ? (
+                <div className="py-12 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+                  <p className="text-gray-400">Loading interviews...</p>
+                </div>
+              ) : error ? (
+                <div className="py-12 text-center text-red-400">
+                  <svg className="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p>Failed to load interviews.</p>
+                  <button 
+                    onClick={() => mutate()}
+                    className="mt-2 px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : filteredInterviews.length > 0 ? (
+                <>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="min-w-full text-white">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Date & Time</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Position</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Company</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredInterviews.map((interview) => {
+                          const formattedDate = formatDate(interview.scheduledAt);
+                          const statusText = getStatusText(interview.status, interview.scheduledAt);
+                          const statusColor = getStatusColor(interview.status, interview.scheduledAt);
+
+                          return (
+                            <tr key={interview.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                              <td className="px-4 py-3">
+                                <div className="text-sm font-medium text-white">{formattedDate.date}</div>
+                                <div className="text-xs text-gray-400">{formattedDate.time}</div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-white">
+                                {interview.position || 'Not specified'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-300">
+                                {interview.company || 'N/A'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
+                                  {statusText}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {interview.meetingRoomId ? (
+                                  <button
+                                    onClick={() => joinMeeting(interview.meetingRoomId)}
+                                    className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                                  >
+                                    Join Meeting
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-500 text-sm">Room not ready</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-4">
+                    {filteredInterviews.map((interview) => {
+                      const formattedDate = formatDate(interview.scheduledAt);
+                      const statusText = getStatusText(interview.status, interview.scheduledAt);
+                      const statusColor = getStatusColor(interview.status, interview.scheduledAt);
+
+                      return (
+                        <div key={interview.id} className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-4 hover:border-purple-500/30 transition-all duration-300">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-white text-base mb-1">
+                                {interview.position || 'Interview'}
+                              </h3>
+                              <div className="flex items-center space-x-2 text-sm text-gray-400 mb-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                <span>{interview.company || 'N/A'}</span>
+                              </div>
+                            </div>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${statusColor} flex-shrink-0 ml-2`}>
+                              {statusText}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                            <div className="flex items-center space-x-2">
+                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-gray-300">{formattedDate.date}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span className="text-gray-300">{formattedDate.time}</span>
                             </div>
                           </div>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusColor} flex-shrink-0 ml-2`}>
-                            {statusText}
-                          </span>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="flex items-center space-x-2">
-                            <i className="fas fa-phone text-gray-400"></i>
-                            <span className="text-gray-600">{interview.phone || 'N/A'}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <i className="fas fa-building text-gray-400"></i>
-                            <span className="text-gray-600">{interview.company || 'N/A'}</span>
-                          </div>
-                        </div>
-
-                        {(interview.notes || interview.interviewer) && (
-                          <div className="mt-3 pt-3 border-t border-gray-100">
-                            {interview.interviewer && (
-                              <div className="flex items-center space-x-2 text-xs text-gray-600 mb-1">
-                                <i className="fas fa-user-tie text-gray-400"></i>
-                                <span>With {interview.interviewer}</span>
-                              </div>
-                            )}
-                            {interview.notes && (
-                              <p className="text-xs text-gray-500 line-clamp-2">
-                                {interview.notes}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Mobile join button area */}
-                        <div className="mt-3 flex justify-end">
-                          {interview.meetingRoomId ? (
-                            <button
-                              onClick={() => joinMeeting(interview.meetingRoomId)}
-                              className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm"
-                            >
-                              Join
-                            </button>
-                          ) : (
-                            <span className="text-gray-500 text-sm">No room yet</span>
+                          {interview.interviewer && (
+                            <div className="flex items-center space-x-2 text-sm text-gray-400 mb-3">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                              <span>Interviewer: {interview.interviewer}</span>
+                            </div>
                           )}
+
+                          <div className="flex justify-end">
+                            {interview.meetingRoomId ? (
+                              <button
+                                onClick={() => joinMeeting(interview.meetingRoomId)}
+                                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 text-sm"
+                              >
+                                Join Meeting
+                              </button>
+                            ) : (
+                              <span className="text-gray-500 text-sm">Room not ready</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                // Empty State
+                <div className="text-center py-8 md:py-12">
+                  <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-300 mb-2">
+                    No {activeTab !== 'all' ? activeTab : ''} interviews found
+                  </h3>
+                  <p className="text-gray-400 text-sm max-w-md mx-auto mb-6">
+                    {activeTab === 'upcoming' 
+                      ? "You don't have any upcoming interviews scheduled. Check back later for updates."
+                      : "No interviews match your current filter."}
+                  </p>
+                  <button
+                    onClick={() => setShowMeetingModal(true)}
+                    className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-105"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span>Join Meeting</span>
+                  </button>
                 </div>
-              </>
-            ) : (
-              // Empty State (keeps your original empty state)
-              <div className="text-center py-8 md:py-12">
-                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <i className="fas fa-clipboard-list text-gray-400 text-2xl"></i>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                  No interviews scheduled
-                </h3>
-                <p className="text-gray-500 text-sm max-w-md mx-auto mb-6">
-                  Your upcoming interviews will appear here once scheduled. Check back later or contact your recruiter.
-                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Floating Meeting Room Button */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <button
+            onClick={() => setShowMeetingModal(true)}
+            className="relative bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 group"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+
+            <div className="absolute inset-0 rounded-full bg-purple-400 animate-ping opacity-75"></div>
+
+            <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-sm rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
+              Join Meeting Room
+              <div className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+            </div>
+          </button>
+        </div>
+
+        {/* Meeting Room Modal */}
+        {showMeetingModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="backdrop-blur-xl bg-gray-800/90 rounded-3xl border border-white/10 shadow-2xl p-6 w-full max-w-md">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-white">Join Meeting Room</h3>
                 <button
-                  onClick={() => setShowMeetingModal(true)}
-                  className="inline-flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  onClick={() => setShowMeetingModal(false)}
+                  className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
                 >
-                  <i className="fas fa-video"></i>
-                  <span>Join Meeting</span>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
-            )}
-          </div>
 
-          {/* Quick Stats - Hidden on mobile */}
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Total Interviews</p>
-                  <p className="text-2xl font-bold text-gray-900">{interviews.length}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-                  <i className="fas fa-calendar-check text-blue-500 text-lg"></i>
-                </div>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Meeting Room ID
+                </label>
+                <input
+                  type="text"
+                  value={meetingRoomId}
+                  onChange={(e) => setMeetingRoomId(e.target.value)}
+                  placeholder="Enter room ID (e.g., 1yixqfpsh6a)"
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white placeholder-gray-400 backdrop-blur-sm"
+                  onKeyPress={(e) => e.key === 'Enter' && joinMeeting(meetingRoomId)}
+                />
+                <p className="text-xs text-gray-400 mt-2">
+                  Enter the meeting ID provided by your interviewer
+                </p>
               </div>
-            </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Upcoming</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {interviews.filter(i => i.scheduledAt && new Date(i.scheduledAt) > new Date()).length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
-                  <i className="fas fa-clock text-green-500 text-lg"></i>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Completed</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {interviews.filter(i => i.status === 'completed').length}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
-                  <i className="fas fa-check-circle text-purple-500 text-lg"></i>
-                </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => { setShowMeetingModal(false); joinMeeting(meetingRoomId); }}
+                  className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 px-4 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Join Meeting</span>
+                </button>
+                <button
+                  onClick={() => setShowMeetingModal(false)}
+                  className="px-4 py-3 text-gray-400 hover:text-white transition-colors rounded-xl hover:bg-white/10"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Floating Meeting Room Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={() => setShowMeetingModal(true)}
-          className="relative bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 group"
-        >
-          <i className="fas fa-video text-xl"></i>
-
-          <div className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75"></div>
-
-          <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-sm rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
-            Join Meeting Room
-            <div className="absolute top-full right-3 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-          </div>
-        </button>
-      </div>
-
-      {/* Meeting Room Modal */}
-      {showMeetingModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Join Meeting Room</h3>
-              <button
-                onClick={() => setShowMeetingModal(false)}
-                className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100"
-              >
-                <i className="fas fa-times text-xl"></i>
-              </button>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Meeting Room ID
-              </label>
-              <input
-                type="text"
-                value={meetingRoomId}
-                onChange={(e) => setMeetingRoomId(e.target.value)}
-                placeholder="Enter room ID (e.g., 1yixqfpsh6a)"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder-gray-500"
-                onKeyPress={(e) => e.key === 'Enter' && joinMeeting(meetingRoomId)}
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Enter the meeting ID provided by your interviewer
-              </p>
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => { setShowMeetingModal(false); joinMeeting(meetingRoomId); }}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-xl font-semibold transition-colors flex items-center justify-center space-x-2"
-              >
-                <i className="fas fa-sign-in-alt"></i>
-                <span>Join Meeting</span>
-              </button>
-              <button
-                onClick={() => setShowMeetingModal(false)}
-                className="px-4 py-3 text-gray-600 hover:text-gray-800 transition-colors rounded-xl hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 };
 
