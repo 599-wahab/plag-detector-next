@@ -258,7 +258,7 @@ export default function Navbar() {
                         </Link>
 
                         <Link
-                          href="/profile"
+                          href="/dashboard/profile"
                           className="flex items-center space-x-3 px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg mx-2 transition-colors"
                           onClick={() => setIsUserMenuOpen(false)}
                         >

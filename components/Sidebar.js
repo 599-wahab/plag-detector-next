@@ -60,28 +60,28 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, handleLogout }) => {
           { 
             id: 2, 
             name: "Schedule Interview", 
-            path: "/dashboard/schedule", 
+            path: "/dashboard/schedule-interview", 
             icon: <FaCalendarAlt />,
             description: "Create new interviews"
           },
           { 
             id: 3, 
             name: "AI Analysis", 
-            path: "/dashboard/analysis", 
+            path: "/dashboard/ai-analysis", 
             icon: <FaRobot />,
             description: "Interview insights"
           },
           { 
             id: 4, 
             name: "Plagiarism Detection", 
-            path: "/dashboard/plagiarism", 
+            path: "/dashboard/plagiarism-detection", 
             icon: <FaSearchPlus />,
             description: "AI-powered detection"
           },
           { 
             id: 5, 
             name: "Interview History", 
-            path: "/dashboard/history", 
+            path: "/dashboard/interview-history", 
             icon: <FaHistory />,
             description: "Past interviews"
           },
