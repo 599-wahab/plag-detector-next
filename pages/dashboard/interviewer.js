@@ -17,6 +17,7 @@ function InterviewerDashboard() {
   const [savingIdx, setSavingIdx] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState('scheduled');
+  const [matchingEngine, setMatchingEngine] = useState('basic');
   const [stats, setStats] = useState({
     total: 0,
     upcoming: 0,
@@ -79,10 +80,12 @@ function InterviewerDashboard() {
   const fetchCandidates = async () => {
     setLoadingCandidates(true);
     try {
-      const res = await fetch("/api/get-candidates");
+      const userId = localStorage.getItem('userId');
+      const res = await fetch(`/api/get-candidates?interviewerId=${userId}`);
       const data = await res.json();
       if (data.success) {
         setCandidates(data.candidates || []);
+        setMatchingEngine(data.matchingEngine || 'basic');
         if (isMobile) {
           setActiveTab('candidates');
         } else {
@@ -182,6 +185,39 @@ function InterviewerDashboard() {
       case 'cancelled': return 'bg-red-500/20 text-red-300 border-red-500/30';
       case 'scheduled': return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
       default: return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+    }
+  };
+
+  // Get AI status badge
+  const getAIStatusBadge = () => {
+    switch (matchingEngine) {
+      case 'gemini-ai':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-300 border border-green-500/30">
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            Powered by Gemini AI
+          </span>
+        );
+      case 'fallback':
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            Basic Matching
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Standard Matching
+          </span>
+        );
     }
   };
 
@@ -559,9 +595,12 @@ function InterviewerDashboard() {
                       <p className="text-gray-400 text-sm">Schedule interviews with candidates</p>
                     </div>
                   </div>
-                  <span className="bg-purple-500/20 text-purple-300 text-xs font-medium px-2.5 py-0.5 rounded-full border border-purple-500/30">
-                    {candidates.length}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span className="bg-purple-500/20 text-purple-300 text-xs font-medium px-2.5 py-0.5 rounded-full border border-purple-500/30">
+                      {candidates.length}
+                    </span>
+                    {getAIStatusBadge()}
+                  </div>
                 </div>
 
                 {candidates.length === 0 ? (
@@ -583,9 +622,16 @@ function InterviewerDashboard() {
                     {candidates.map((candidate, idx) => (
                       <div key={candidate.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:border-purple-500/30 transition-all duration-300">
                         <div className="mb-4">
-                          <h3 className="font-semibold text-white text-sm mb-1">
-                            {candidate.full_name || candidate.email}
-                          </h3>
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-semibold text-white text-sm">
+                              {candidate.full_name || candidate.email}
+                            </h3>
+                            {candidate.matchScore && (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${candidate.compatibilityColor}`}>
+                                {candidate.matchScore}/10
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-gray-400 space-y-1">
                             <div className="flex items-center space-x-2">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -593,7 +639,7 @@ function InterviewerDashboard() {
                               </svg>
                               <span>{candidate.email}</span>
                             </div>
-                            {candidate.phone && (
+                            {candidate.phone && candidate.phone !== 'N/A' && (
                               <div className="flex items-center space-x-2">
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -686,7 +732,7 @@ function InterviewerDashboard() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="candidates-title"
-              className="relative backdrop-blur-xl bg-gray-800/95 rounded-3xl border border-white/10 shadow-2xl w-full max-w-4xl p-6 my-8 overflow-hidden"
+              className="relative backdrop-blur-xl bg-gray-800/95 rounded-3xl border border-white/10 shadow-2xl w-full max-w-6xl p-6 my-8 overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -698,8 +744,11 @@ function InterviewerDashboard() {
                     </svg>
                   </div>
                   <div>
-                    <h3 id="candidates-title" className="text-xl font-semibold text-white">Schedule Interviews</h3>
-                    <p className="text-gray-400 text-sm">Select candidates and schedule interviews</p>
+                    <h3 id="candidates-title" className="text-xl font-semibold text-white">AI-Matched Candidates</h3>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-gray-400 text-sm">Candidates sorted by compatibility with your profile</p>
+                      {getAIStatusBadge()}
+                    </div>
                   </div>
                 </div>
 
@@ -716,7 +765,7 @@ function InterviewerDashboard() {
               </div>
 
               {/* Body: scrollable list */}
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                 {candidates.length === 0 ? (
                   <div className="text-center py-8">
                     <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -726,62 +775,124 @@ function InterviewerDashboard() {
                   </div>
                 ) : (
                   candidates.map((candidate, idx) => (
-                    <div key={candidate.id} className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl hover:border-purple-500/30 transition-all duration-300">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-white truncate">{candidate.full_name || candidate.email}</div>
-                        <div className="text-sm text-gray-400 truncate">
-                          {candidate.email}
-                          {candidate.phone ? ` • ${candidate.phone}` : ''}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 ml-4">
-                        <input
-                          type="datetime-local"
-                          value={scheduleDates[idx] || ""}
-                          onChange={(e) => setScheduleDates(prev => ({ ...prev, [idx]: e.target.value }))}
-                          className="bg-white/10 border border-white/20 p-2 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm"
-                        />
-
-                        <div className="flex items-center gap-2">
-                          <label className="flex items-center gap-2 text-sm text-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={!!(meetingRoomInputs[idx]?.createRoom)}
-                              onChange={(e) => setMeetingRoomInputs(prev => ({ ...prev, [idx]: { ...(prev[idx]||{}), createRoom: e.target.checked } }))}
-                              className="rounded border-white/20 bg-white/10 text-purple-500 focus:ring-purple-500"
-                            />
-                            <span>Create Room</span>
-                          </label>
-
-                          <input
-                            type="text"
-                            placeholder="Or enter room id"
-                            value={(meetingRoomInputs[idx]?.meetingRoomId) || ""}
-                            onChange={(e) => setMeetingRoomInputs(prev => ({ ...prev, [idx]: { ...(prev[idx]||{}), meetingRoomId: e.target.value } }))}
-                            className="bg-white/10 border border-white/20 p-2 rounded-xl w-32 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm"
-                          />
-                        </div>
-
-                        <button
-                          onClick={() => saveInterview(candidate, idx)}
-                          disabled={savingIdx === idx || !scheduleDates[idx]}
-                          className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:bg-gray-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-105 disabled:transform-none disabled:opacity-50"
-                        >
-                          {savingIdx === idx ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                              <span>Saving...</span>
-                            </>
-                          ) : (
-                            <>
+                    <div key={candidate.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:border-purple-500/30 transition-all duration-300">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h4 className="font-semibold text-white text-lg truncate">
+                              {candidate.full_name || candidate.email}
+                            </h4>
+                            {candidate.matchScore && (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${candidate.compatibilityColor}`}>
+                                {candidate.compatibilityLevel} Match ({candidate.matchScore}/10)
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="text-sm text-gray-400 space-y-1">
+                            <div className="flex items-center space-x-2">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                               </svg>
-                              <span>Schedule</span>
-                            </>
+                              <span>{candidate.email}</span>
+                            </div>
+                            {candidate.phone && candidate.phone !== 'N/A' && (
+                              <div className="flex items-center space-x-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                </svg>
+                                <span>{candidate.phone}</span>
+                              </div>
+                            )}
+                            {candidate.qualification && (
+                              <div className="flex items-center space-x-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+                                </svg>
+                                <span>{candidate.qualification}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Matching Details */}
+                          {candidate.matchingAreas && (
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-start space-x-2">
+                                <svg className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div>
+                                  <p className="text-green-300 text-sm font-medium">Matching Areas:</p>
+                                  <p className="text-green-200 text-xs">{candidate.matchingAreas.join(', ')}</p>
+                                </div>
+                              </div>
+                              
+                              {candidate.interviewFocus && (
+                                <div className="flex items-start space-x-2">
+                                  <svg className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                  </svg>
+                                  <div>
+                                    <p className="text-blue-300 text-sm font-medium">Suggested Focus:</p>
+                                    <p className="text-blue-200 text-xs">{candidate.interviewFocus.join(', ')}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           )}
-                        </button>
+                        </div>
+
+                        <div className="ml-4 flex-shrink-0">
+                          {/* Schedule form */}
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="datetime-local"
+                              value={scheduleDates[idx] || ""}
+                              onChange={(e) => setScheduleDates(prev => ({ ...prev, [idx]: e.target.value }))}
+                              className="bg-white/10 border border-white/20 p-2 rounded-xl text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm"
+                            />
+
+                            <div className="flex items-center gap-2">
+                              <label className="flex items-center gap-2 text-sm text-gray-300">
+                                <input
+                                  type="checkbox"
+                                  checked={!!(meetingRoomInputs[idx]?.createRoom)}
+                                  onChange={(e) => setMeetingRoomInputs(prev => ({ ...prev, [idx]: { ...(prev[idx]||{}), createRoom: e.target.checked } }))}
+                                  className="rounded border-white/20 bg-white/10 text-purple-500 focus:ring-purple-500"
+                                />
+                                <span>Create Room</span>
+                              </label>
+
+                              <input
+                                type="text"
+                                placeholder="Or enter room id"
+                                value={(meetingRoomInputs[idx]?.meetingRoomId) || ""}
+                                onChange={(e) => setMeetingRoomInputs(prev => ({ ...prev, [idx]: { ...(prev[idx]||{}), meetingRoomId: e.target.value } }))}
+                                className="bg-white/10 border border-white/20 p-2 rounded-xl w-32 text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm"
+                              />
+                            </div>
+
+                            <button
+                              onClick={() => saveInterview(candidate, idx)}
+                              disabled={savingIdx === idx || !scheduleDates[idx]}
+                              className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:bg-gray-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-105 disabled:transform-none disabled:opacity-50"
+                            >
+                              {savingIdx === idx ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                  <span>Saving...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>Schedule</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))

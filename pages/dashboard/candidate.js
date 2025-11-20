@@ -4,6 +4,7 @@ import Head from 'next/head';
 import withAuth from '../../lib/withAuth';
 import Sidebar from '../../components/Sidebar';
 import Navbar from "../../components/Navbar";
+import ProfileCompletionPopup from '../../components/ProfileCompletionPopup';
 import useSWR from 'swr';
 
 // fetcher for SWR
@@ -20,6 +21,11 @@ const CandidateDashboard = () => {
   const [meetingRoomId, setMeetingRoomId] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState('upcoming');
+
+  // Profile completion state
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [profileComplete, setProfileComplete] = useState(true);
+  const [missingFields, setMissingFields] = useState([]);
 
   // userId (safe for SSR)
   const [userId, setUserId] = useState(null);
@@ -51,6 +57,28 @@ const CandidateDashboard = () => {
     }
   });
 
+  // Check profile completion
+  const checkProfileCompletion = async (uid) => {
+    try {
+      const res = await fetch(`/api/check-profile-complete?userId=${uid}`);
+      const data = await res.json();
+      
+      if (data.success) {
+        setProfileComplete(data.isComplete);
+        setMissingFields(data.missingFields || []);
+        
+        // Show popup if profile is not complete
+        if (!data.isComplete) {
+          setTimeout(() => {
+            setShowProfilePopup(true);
+          }, 1500);
+        }
+      }
+    } catch (err) {
+      console.error('Error checking profile completion:', err);
+    }
+  };
+
   // run on mount: set userId, sidebar state, profile, resize handlers
   useEffect(() => {
     // responsive check
@@ -67,8 +95,9 @@ const CandidateDashboard = () => {
     if (uid) {
       setUserId(uid);
       userIdRef.current = uid;
-      // fetch profile (not via SWR to keep your original behavior)
+      // fetch profile and check completion
       fetchProfile(uid);
+      checkProfileCompletion(uid);
     }
 
     return () => window.removeEventListener('resize', checkMobile);
@@ -83,6 +112,15 @@ const CandidateDashboard = () => {
     } catch (err) {
       console.error('Failed to fetch profile:', err);
       setFullName('Candidate');
+    }
+  };
+
+  const handleProfileComplete = () => {
+    setProfileComplete(true);
+    setShowProfilePopup(false);
+    // Refresh profile data
+    if (userId) {
+      fetchProfile(userId);
     }
   };
 
@@ -156,6 +194,16 @@ const CandidateDashboard = () => {
         <title>Candidate Dashboard - Skill Scanner</title>
         <meta name="description" content="Manage your interviews and track your progress on Skill Scanner" />
       </Head>
+
+      {/* Profile Completion Popup */}
+      {showProfilePopup && (
+        <ProfileCompletionPopup
+          userId={userId}
+          missingFields={missingFields}
+          onClose={() => setShowProfilePopup(false)}
+          onProfileComplete={handleProfileComplete}
+        />
+      )}
 
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-black">
         {/* Navbar */}

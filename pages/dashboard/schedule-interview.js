@@ -27,19 +27,57 @@ const ScheduleInterviewPage = () => {
     fetchCandidates();
   }, []);
 
-  const fetchCandidates = async () => {
-    try {
-      const response = await fetch('/api/get-candidates');
-      const data = await response.json();
-      if (data.success) {
-        setCandidates(data.candidates || []);
-      }
-    } catch (error) {
-      console.error('Error fetching candidates:', error);
-    } finally {
-      setLoading(false);
+  // In the ScheduleInterviewPage component, update the fetchCandidates function:
+
+const fetchCandidates = async () => {
+  try {
+    const userId = localStorage.getItem('userId');
+    const response = await fetch(`/api/get-candidates?interviewerId=${userId}`);
+    const data = await response.json();
+    if (data.success) {
+      setCandidates(data.candidates || []);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching candidates:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Update the candidate selection UI to show match scores:
+
+{candidates.map((candidate) => (
+  <div
+    key={candidate.id}
+    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-300 ${
+      selectedCandidate?.id === candidate.id
+        ? 'bg-purple-500/20 border-purple-500/50'
+        : 'bg-white/5 border-white/10 hover:border-purple-500/30'
+    }`}
+    onClick={() => setSelectedCandidate(candidate)}
+  >
+    <div className="flex items-center justify-between mb-2">
+      <h3 className="font-semibold text-white">{candidate.full_name || candidate.email}</h3>
+      {candidate.matchScore && (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${candidate.compatibilityColor}`}>
+          {candidate.matchScore}/10
+        </span>
+      )}
+    </div>
+    <p className="text-gray-400 text-sm mt-1">{candidate.email}</p>
+    {candidate.phone && candidate.phone !== 'N/A' && (
+      <p className="text-gray-400 text-sm">{candidate.phone}</p>
+    )}
+    {candidate.qualification && (
+      <p className="text-blue-300 text-sm mt-1">{candidate.qualification}</p>
+    )}
+    {candidate.matchingAreas && (
+      <p className="text-green-300 text-xs mt-1">
+        Matches: {candidate.matchingAreas.slice(0, 3).join(', ')}
+      </p>
+    )}
+  </div>
+))}
 
   const toggleSidebar = () => {
     const newState = !sidebarCollapsed;

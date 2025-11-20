@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     if (!userRow) return res.status(404).json({ success: false, error: 'User not found' });
 
     const profileRow = (await query(
-      `SELECT full_name, phone, address, qualification, recent_studied, gender FROM user_profiles WHERE user_id = $1`,
+      `SELECT full_name, phone, address, qualification, recent_studied, gender, bio FROM user_profiles WHERE user_id = $1`,
       [userId]
     )).rows[0];
 
@@ -22,7 +22,8 @@ export default async function handler(req, res) {
       address: profileRow ? profileRow.address : '',
       qualification: profileRow ? profileRow.qualification : '',
       recentStudied: profileRow ? profileRow.recent_studied : '',
-      gender: profileRow ? profileRow.gender : ''
+      gender: profileRow ? profileRow.gender : '',
+      bio: profileRow ? profileRow.bio : '' // Add bio field
     };
 
     return res.json({ success: true, profile });
