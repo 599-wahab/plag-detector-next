@@ -130,13 +130,6 @@ const Sidebar = ({ sidebarCollapsed, toggleSidebar, handleLogout }) => {
             description: "Upcoming & past"
           },
           { 
-            id: 3, 
-            name: "Practice Sessions", 
-            path: "/dashboard/practice", 
-            icon: <FaClipboardList className="text-lg" />,
-            description: "Prepare for interviews"
-          },
-          { 
             id: 4, 
             name: "AI Feedback", 
             path: "/dashboard/feedback", 
